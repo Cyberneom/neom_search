@@ -1,21 +1,5 @@
 dependency_overrides:
-  neom_audio_player:
-    path: ../neom_audio_player
-  neom_booking:
-    path: ../neom_booking
   neom_commons:
     path: ../neom_commons
-  neom_events:
-    path: ../neom_events
-  neom_jobs:
-    path: ../neom_jobs
-  neom_notifications:
-    path: ../neom_notifications
-#  neom_itemlists:
-#    path: ../neom_itemlists
-#  neom_profile:
-#    path: ../neom_profile
-#  neom_timeline:
-#    path: ../neom_timeline
-
-#
+  neom_itemlists:
+    path: ../neom_itemlists

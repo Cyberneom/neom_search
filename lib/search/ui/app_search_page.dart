@@ -29,8 +29,7 @@ class AppSearchPage extends StatelessWidget {
             : ListView(
           children: buildCombinedSearchList(_, context)
         )
-        ),
-      )
+      ),)
     ),
     );
   }

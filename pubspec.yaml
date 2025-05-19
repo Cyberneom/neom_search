@@ -1,7 +1,7 @@
-name: neom_home
-description: Home for Cyberneom.
-version: 1.3.0
-homepage: https://github.com/Cyberneom/neom_home
+name: neom_search
+description: Search for Cyberneom.
+version: 1.0.0
+homepage: https://github.com/Cyberneom/neom_search
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 environment:
@@ -15,30 +15,9 @@ dependencies:
   neom_commons:
     git:
       url: git@github.com:Cyberneom/neom_commons.git
-  neom_events:
+  neom_itemlists:
     git:
-      url: git@github.com:Cyberneom/neom_events.git
-#  neom_itemlists:
-#    git:
-#      url: git@github.com:Cyberneom/neom_itemlists.git
-#  neom_profile:
-#    git:
-#      url: git@github.com:Cyberneom/neom_profile.git
-#  neom_timeline:
-#    git:
-#      url: git@github.com:Cyberneom/neom_timeline.git
-  neom_audio_player:
-    git:
-      url: https://github.com/Cyberneom/neom_audio_player.git
-  neom_booking:
-    git:
-      url: git@github.com:emmanuel-montoya/neom_booking.git
-  neom_jobs:
-    git:
-      url: git@github.com:emmanuel-montoya/neom_jobs.git
-  neom_notifications:
-    git:
-      url: git@github.com:Cyberneom/neom_notifications.git
+      url: git@github.com:Cyberneom/neom_itemlists.git
 
 dev_dependencies:
   flutter_test:
