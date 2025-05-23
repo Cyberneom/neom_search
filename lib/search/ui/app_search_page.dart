@@ -33,6 +33,7 @@ class AppSearchPage extends StatelessWidget {
     ),
     );
   }
+
   List<Widget> buildCombinedSearchList(AppSearchController controller, BuildContext context) {
     List<Widget> combined = [];
     combined.addAll(buildMateTiles(controller.sortedProfileLocation.value.values.toList(), context));

@@ -33,7 +33,7 @@ class AppSearchController extends GetxController implements SearchService {
 
   final Rx<SplayTreeMap<double, AppProfile>> sortedProfileLocation = SplayTreeMap<double, AppProfile>().obs;
 
-  SearchType searchType = SearchType.profile;
+  SearchType searchType = SearchType.profiles;
 
   @override
   void onInit() {
@@ -49,22 +49,9 @@ class AppSearchController extends GetxController implements SearchService {
           searchType = firstArg;
         }
 
-        switch(searchType) {
-          case SearchType.profile:
-            loadProfiles();
-            break;
-          case SearchType.band:
-            break;
-          case SearchType.event:
-            break;
-          case SearchType.any:
-            loadProfiles();
-            loadItems();
-            break;
-        }
-      } else {
-        loadProfiles();
       }
+
+      loadSearchInfo();
     } catch (e) {
       AppUtilities.logger.e(e.toString());
     }
@@ -75,12 +62,35 @@ class AppSearchController extends GetxController implements SearchService {
   void onReady() {
     super.onReady();
     try {
-      setSearchParam("");
+
     } catch (e) {
       AppUtilities.logger.e(e.toString());
     }
 
     update([AppPageIdConstants.search]);
+  }
+
+  Future<void> loadSearchInfo() async {
+
+    AppUtilities.logger.i("Search Type: $searchType");
+
+    switch(searchType) {
+      case SearchType.profiles:
+        await loadProfiles();
+        break;
+      case SearchType.bands:
+        break;
+      case SearchType.events:
+        break;
+      case SearchType.items:
+        await loadItems();
+      case SearchType.any:
+        await loadProfiles();
+        loadItems();
+        break;
+    }
+
+    setSearchParam("");
   }
 
   @override
@@ -114,6 +124,7 @@ class AppSearchController extends GetxController implements SearchService {
 
   @override
   Future<void> loadProfiles({bool includeSelf = false}) async {
+    AppUtilities.logger.d("Loading Profiles");
     try {
       await mateController.loadProfiles(includeSelf: includeSelf);
       filteredProfiles.value.addAll(mateController.followingProfiles);
@@ -132,6 +143,8 @@ class AppSearchController extends GetxController implements SearchService {
 
   @override
   Future<void> loadItems() async {
+    AppUtilities.logger.d("Loading Items");
+
     try {
       mediaItems = await AppMediaItemFirestore().fetchAll();
       releaseItems = await AppReleaseItemFirestore().retrieveAll();
@@ -155,8 +168,8 @@ class AppSearchController extends GetxController implements SearchService {
       sortedProfileLocation.value[distanceBetweenProfiles] = mate;
     });
 
-    AppUtilities.logger.i("Filtered Profiles ${filteredProfiles.value.length}");
-    AppUtilities.logger.i("Sortered Profiles ${sortedProfileLocation.value.length}");
+    AppUtilities.logger.d("Filtered Profiles ${filteredProfiles.value.length}");
+    AppUtilities.logger.d("Sortered Profiles ${sortedProfileLocation.value.length}");
     update([AppPageIdConstants.search]);
   }
 
