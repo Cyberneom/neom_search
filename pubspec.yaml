@@ -1,5 +1,5 @@
 name: neom_search
-description: Search for Cyberneom.
+description: Search for Open Neom.
 version: 1.0.0
 homepage: https://github.com/Cyberneom/neom_search
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -12,12 +12,18 @@ dependencies:
   flutter:
     sdk: flutter
 
+  neom_core:
+    git:
+      url: git@github.com:Cyberneom/neom_core.git
   neom_commons:
     git:
       url: git@github.com:Cyberneom/neom_commons.git
   neom_itemlists:
     git:
       url: git@github.com:Cyberneom/neom_itemlists.git
+  neom_google_books:
+    git:
+      url: git@github.com:Cyberneom/neom_google_books.git
 
 dev_dependencies:
   flutter_test:

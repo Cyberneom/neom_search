@@ -3,17 +3,20 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/core/data/firestore/app_media_item_firestore.dart';
-import 'package:neom_commons/core/data/firestore/app_release_item_firestore.dart';
-import 'package:neom_commons/core/data/implementations/mate_controller.dart';
-import 'package:neom_commons/core/data/implementations/user_controller.dart';
-import 'package:neom_commons/core/domain/model/app_media_item.dart';
-import 'package:neom_commons/core/domain/model/app_profile.dart';
-import 'package:neom_commons/core/domain/model/app_release_item.dart';
-import 'package:neom_commons/core/domain/use_cases/search_service.dart';
-import 'package:neom_commons/core/utils/app_utilities.dart';
-import 'package:neom_commons/core/utils/constants/app_page_id_constants.dart';
-import 'package:neom_commons/core/utils/enums/search_type.dart';
+import 'package:neom_commons/commons/utils/app_utilities.dart';
+import 'package:neom_commons/commons/utils/constants/app_page_id_constants.dart';
+import 'package:neom_core/core/app_config.dart';
+import 'package:neom_core/core/data/firestore/app_media_item_firestore.dart';
+import 'package:neom_core/core/data/firestore/app_release_item_firestore.dart';
+import 'package:neom_core/core/data/implementations/mate_controller.dart';
+import 'package:neom_core/core/data/implementations/user_controller.dart';
+import 'package:neom_core/core/domain/model/app_media_item.dart';
+import 'package:neom_core/core/domain/model/app_profile.dart';
+import 'package:neom_core/core/domain/model/app_release_item.dart';
+import 'package:neom_core/core/domain/use_cases/search_service.dart';
+import 'package:neom_core/core/utils/enums/search_type.dart';
+import 'package:neom_core/core/utils/position_utilities.dart';
+
 
 class AppSearchController extends GetxController implements SearchService {
 
@@ -21,24 +24,24 @@ class AppSearchController extends GetxController implements SearchService {
   MateController mateController = Get.put(MateController());
   ScrollController scrollController = ScrollController();
 
-  final RxBool isLoading = true.obs;
-  final RxString searchParam = "".obs;
+  RxBool isLoading = true.obs;
+  RxString searchParam = "".obs;
 
-  final RxMap<String, AppProfile> filteredProfiles = <String, AppProfile>{}.obs;
+  RxMap<String, AppProfile> filteredProfiles = <String, AppProfile>{}.obs;
 
   Map<String, AppMediaItem> mediaItems = {};
   Map<String, AppReleaseItem> releaseItems = {};
-  final RxMap<String, AppMediaItem> filteredMediaItems = <String, AppMediaItem>{}.obs;
-  final RxMap<String, AppReleaseItem> filteredReleaseItems = <String, AppReleaseItem>{}.obs;
+  RxMap<String, AppMediaItem> filteredMediaItems = <String, AppMediaItem>{}.obs;
+  RxMap<String, AppReleaseItem> filteredReleaseItems = <String, AppReleaseItem>{}.obs;
 
-  final Rx<SplayTreeMap<double, AppProfile>> sortedProfileLocation = SplayTreeMap<double, AppProfile>().obs;
+  Rx<SplayTreeMap<double, AppProfile>> sortedProfileLocation = SplayTreeMap<double, AppProfile>().obs;
 
   SearchType searchType = SearchType.profiles;
 
   @override
   void onInit() {
     super.onInit();
-    AppUtilities.logger.i("Search Controller Init");
+    AppConfig.logger.i("Search Controller Init");
 
     try {
       final args = Get.arguments;
@@ -51,9 +54,8 @@ class AppSearchController extends GetxController implements SearchService {
 
       }
 
-      loadSearchInfo();
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
 
   }
@@ -62,9 +64,9 @@ class AppSearchController extends GetxController implements SearchService {
   void onReady() {
     super.onReady();
     try {
-
+      loadSearchInfo();
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
 
     update([AppPageIdConstants.search]);
@@ -72,7 +74,8 @@ class AppSearchController extends GetxController implements SearchService {
 
   Future<void> loadSearchInfo() async {
 
-    AppUtilities.logger.i("Search Type: $searchType");
+    AppConfig.logger.i("Search Type: $searchType");
+    setSearchParam("");
 
     switch(searchType) {
       case SearchType.profiles:
@@ -90,15 +93,16 @@ class AppSearchController extends GetxController implements SearchService {
         break;
     }
 
-    setSearchParam("");
   }
 
   @override
   void setSearchParam(String param, {bool onlyByName = false}) {
-    searchParam.value = param;
+    AppConfig.logger.d("Search Param: $param, Only By Name: $onlyByName");
+
+    searchParam.value = AppUtilities.normalizeString(param);
     filteredProfiles.value = searchParam.isEmpty ? mateController.totalProfiles
-        : onlyByName ? mateController.filterByName(searchParam.value)
-        : mateController.filterByNameOrInstrument(searchParam.value);
+        : onlyByName ? AppUtilities.filterByName(mateController.totalProfiles, searchParam.value)
+        : AppUtilities.filterByNameOrInstrument(mateController.totalProfiles, searchParam.value);
     // Actualizamos el filtrado de media items:
     filteredMediaItems.value = searchParam.isEmpty
         ? mediaItems
@@ -124,16 +128,20 @@ class AppSearchController extends GetxController implements SearchService {
 
   @override
   Future<void> loadProfiles({bool includeSelf = false}) async {
-    AppUtilities.logger.d("Loading Profiles");
+    AppConfig.logger.d("Loading Profiles");
     try {
-      await mateController.loadProfiles(includeSelf: includeSelf);
+
+      if(mateController.profiles.isEmpty) {
+        await mateController.loadProfiles(includeSelf: includeSelf);
+      }
       filteredProfiles.value.addAll(mateController.followingProfiles);
       filteredProfiles.value.addAll(mateController.followerProfiles);
       filteredProfiles.value.addAll(mateController.mates);
       filteredProfiles.value.addAll(mateController.profiles);
+      AppConfig.logger.d("Filtered Profiles ${filteredProfiles.value.length}");
       sortByLocation();
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
 
 
@@ -143,13 +151,13 @@ class AppSearchController extends GetxController implements SearchService {
 
   @override
   Future<void> loadItems() async {
-    AppUtilities.logger.d("Loading Items");
+    AppConfig.logger.d("Loading Items");
 
     try {
       mediaItems = await AppMediaItemFirestore().fetchAll();
       releaseItems = await AppReleaseItemFirestore().retrieveAll();
     } catch (e) {
-      AppUtilities.logger.e(e.toString());
+      AppConfig.logger.e(e.toString());
     }
 
     isLoading.value = false;
@@ -160,7 +168,7 @@ class AppSearchController extends GetxController implements SearchService {
   void sortByLocation() {
     sortedProfileLocation.value.clear();
     filteredProfiles.value.forEach((key, mate) {
-      double distanceBetweenProfiles = AppUtilities.distanceBetweenPositions(
+      double distanceBetweenProfiles = PositionUtilities.distanceBetweenPositions(
           userController.profile.position!,
           mate.position!);
 
@@ -168,9 +176,7 @@ class AppSearchController extends GetxController implements SearchService {
       sortedProfileLocation.value[distanceBetweenProfiles] = mate;
     });
 
-    AppUtilities.logger.d("Filtered Profiles ${filteredProfiles.value.length}");
-    AppUtilities.logger.d("Sortered Profiles ${sortedProfileLocation.value.length}");
-    update([AppPageIdConstants.search]);
+    AppConfig.logger.d("Sortered Profiles ${sortedProfileLocation.value.length}");
   }
 
 }

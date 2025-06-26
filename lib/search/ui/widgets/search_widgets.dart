@@ -1,15 +1,22 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/core/app_flavour.dart';
-import 'package:neom_commons/core/domain/model/app_media_item.dart';
-import 'package:neom_commons/core/domain/model/app_profile.dart';
-import 'package:neom_commons/core/utils/app_theme.dart';
-import 'package:neom_commons/core/utils/app_utilities.dart';
-import 'package:neom_commons/core/utils/constants/app_route_constants.dart';
-import 'package:neom_commons/core/utils/enums/profile_type.dart';
-import 'package:neom_commons/core/utils/enums/verification_level.dart';
-import 'package:neom_itemlists/itemlists/ui/widgets/app_item_widgets.dart';
+import 'package:neom_commons/commons/app_flavour.dart';
+import 'package:neom_commons/commons/ui/theme/app_theme.dart';
+import 'package:neom_commons/commons/ui/widgets/neom_image_card.dart';
+import 'package:neom_commons/commons/utils/app_utilities.dart';
+import 'package:neom_commons/commons/utils/constants/app_assets.dart';
+import 'package:neom_commons/commons/utils/mappers/app_media_item_mapper.dart';
+import 'package:neom_core/core/app_config.dart';
+import 'package:neom_core/core/app_properties.dart';
+import 'package:neom_core/core/data/implementations/app_hive_controller.dart';
+import 'package:neom_core/core/domain/model/app_media_item.dart';
+import 'package:neom_core/core/domain/model/app_profile.dart';
+import 'package:neom_core/core/domain/model/item_list.dart';
+import 'package:neom_core/core/utils/constants/app_route_constants.dart';
+import 'package:neom_core/core/utils/enums/media_item_type.dart';
+import 'package:neom_core/core/utils/enums/profile_type.dart';
+import 'package:neom_core/core/utils/enums/verification_level.dart';
 
 import '../app_search_controller.dart';
 
@@ -25,14 +32,14 @@ List<Widget> buildMateTiles(List<AppProfile> mates, BuildContext context) {
         leading: CachedNetworkImage(
           imageUrl: mate.photoUrl.isNotEmpty
               ? mate.photoUrl
-              : AppFlavour.getAppLogoUrl(),
+              : AppProperties.getAppLogoUrl(),
           placeholder: (context, url) => const CircleAvatar(
             child: CircularProgressIndicator(),
           ),
           errorWidget: (context, url, error) {
-            AppUtilities.logger.w("Error loading image: $error");
+            AppConfig.logger.w("Error loading image: $error");
             return CircleAvatar(
-              backgroundImage: CachedNetworkImageProvider(AppFlavour.getAppLogoUrl()),
+              backgroundImage: CachedNetworkImageProvider(AppProperties.getAppLogoUrl()),
             );
           },
           imageBuilder: (context, imageProvider) => CircleAvatar(
@@ -80,13 +87,41 @@ List<Widget> buildMateTiles(List<AppProfile> mates, BuildContext context) {
 
 List<Widget> buildMediaTiles(AppSearchController controller, BuildContext context) {
   return controller.filteredMediaItems.value.values.map((mediaItem) {
-    return createCoolMediaItemTile(context, mediaItem);
+    return buildMediaItemTile(context, mediaItem);
   }).toList();
 }
 
 List<Widget> buildReleaseTiles(AppSearchController controller, BuildContext context) {
   return controller.filteredReleaseItems.value.values.map((releaseItem) {
-    AppMediaItem converted = AppMediaItem.fromAppReleaseItem(releaseItem);
-    return createMediaItemTile(context, converted);
+    AppMediaItem convertedMediaItem = AppMediaItemMapper.fromAppReleaseItem(releaseItem);
+    return buildMediaItemTile(context, convertedMediaItem);
   }).toList();
+}
+
+ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem,
+    {Itemlist? itemlist, String query = ''}) {
+
+  return ListTile(
+    contentPadding: const EdgeInsets.only(left: 15.0,),
+    title: Text(appMediaItem.name,
+      style: const TextStyle(fontWeight: FontWeight.w500,),
+      overflow: TextOverflow.ellipsis,
+    ),
+    subtitle: Text(AppUtilities.getArtistName(appMediaItem.artist),
+      overflow: TextOverflow.ellipsis,
+    ),
+    isThreeLine: false,
+    leading: NeomImageCard(
+        placeholderImage: const AssetImage(AppAssets.audioPlayerCover),
+        imageUrl: appMediaItem.imgUrl
+    ),
+    onTap: () {
+      if(appMediaItem.type == MediaItemType.song) {
+        Get.toNamed(AppRouteConstants.audioPlayerMedia, arguments: [appMediaItem]);
+      } else {
+        Get.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [appMediaItem]);
+      }
+      AppHiveController().addQuery(appMediaItem.name);
+    },
+  );
 }

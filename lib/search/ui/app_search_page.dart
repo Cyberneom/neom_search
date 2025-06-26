@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/core/utils/app_color.dart';
-import 'package:neom_commons/core/utils/app_theme.dart';
-import 'package:neom_commons/core/utils/constants/app_page_id_constants.dart';
+import 'package:neom_commons/commons/ui/theme/app_color.dart';
+import 'package:neom_commons/commons/ui/theme/app_theme.dart';
+import 'package:neom_commons/commons/utils/constants/app_page_id_constants.dart';
 
 import 'app_search_controller.dart';
 import 'widgets/appbar_search.dart';
