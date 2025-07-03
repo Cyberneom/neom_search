@@ -18,9 +18,6 @@ dependencies:
   neom_commons:
     git:
       url: git@github.com:Cyberneom/neom_commons.git
-  neom_itemlists:
-    git:
-      url: git@github.com:Cyberneom/neom_itemlists.git
   neom_google_books:
     git:
       url: git@github.com:Cyberneom/neom_google_books.git
