@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
-import 'package:neom_core/core/utils/constants/app_route_constants.dart';
-import 'search/ui/app_search_page.dart';
-import 'search/ui/media_items/app_media_item_search_page.dart';
+import 'package:neom_core/utils/constants/app_route_constants.dart';
+import 'ui/app_search_page.dart';
+import 'ui/media_items/app_media_item_search_page.dart';
 
 class SearchRoutes {
 

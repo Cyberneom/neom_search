@@ -1,5 +1,6 @@
 
-import 'package:neom_core/core/domain/model/app_media_item.dart';
+
+import 'package:neom_core/domain/model/app_media_item.dart';
 
 abstract class AppMediaItemSearchService {
 

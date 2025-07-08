@@ -1,22 +1,22 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/commons/app_flavour.dart';
-import 'package:neom_commons/commons/ui/theme/app_theme.dart';
-import 'package:neom_commons/commons/ui/widgets/neom_image_card.dart';
-import 'package:neom_commons/commons/utils/app_utilities.dart';
-import 'package:neom_commons/commons/utils/constants/app_assets.dart';
-import 'package:neom_commons/commons/utils/mappers/app_media_item_mapper.dart';
-import 'package:neom_core/core/app_config.dart';
-import 'package:neom_core/core/app_properties.dart';
-import 'package:neom_core/core/data/implementations/app_hive_controller.dart';
-import 'package:neom_core/core/domain/model/app_media_item.dart';
-import 'package:neom_core/core/domain/model/app_profile.dart';
-import 'package:neom_core/core/domain/model/item_list.dart';
-import 'package:neom_core/core/utils/constants/app_route_constants.dart';
-import 'package:neom_core/core/utils/enums/media_item_type.dart';
-import 'package:neom_core/core/utils/enums/profile_type.dart';
-import 'package:neom_core/core/utils/enums/verification_level.dart';
+import 'package:neom_commons/app_flavour.dart';
+import 'package:neom_commons/ui/theme/app_theme.dart';
+import 'package:neom_commons/ui/widgets/neom_image_card.dart';
+import 'package:neom_commons/utils/constants/app_assets.dart';
+import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
+import 'package:neom_commons/utils/text_utilities.dart';
+import 'package:neom_core/app_config.dart';
+import 'package:neom_core/app_properties.dart';
+import 'package:neom_core/data/implementations/app_hive_controller.dart';
+import 'package:neom_core/domain/model/app_media_item.dart';
+import 'package:neom_core/domain/model/app_profile.dart';
+import 'package:neom_core/domain/model/item_list.dart';
+import 'package:neom_core/utils/constants/app_route_constants.dart';
+import 'package:neom_core/utils/enums/media_item_type.dart';
+import 'package:neom_core/utils/enums/profile_type.dart';
+import 'package:neom_core/utils/enums/verification_level.dart';
 
 import '../app_search_controller.dart';
 
@@ -107,7 +107,7 @@ ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem,
       style: const TextStyle(fontWeight: FontWeight.w500,),
       overflow: TextOverflow.ellipsis,
     ),
-    subtitle: Text(AppUtilities.getArtistName(appMediaItem.artist),
+    subtitle: Text(TextUtilities.getArtistName(appMediaItem.artist),
       overflow: TextOverflow.ellipsis,
     ),
     isThreeLine: false,

@@ -3,19 +3,20 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
-import 'package:neom_commons/commons/utils/app_utilities.dart';
-import 'package:neom_commons/commons/utils/constants/app_page_id_constants.dart';
-import 'package:neom_core/core/app_config.dart';
-import 'package:neom_core/core/data/firestore/app_media_item_firestore.dart';
-import 'package:neom_core/core/data/firestore/app_release_item_firestore.dart';
-import 'package:neom_core/core/data/implementations/mate_controller.dart';
-import 'package:neom_core/core/data/implementations/user_controller.dart';
-import 'package:neom_core/core/domain/model/app_media_item.dart';
-import 'package:neom_core/core/domain/model/app_profile.dart';
-import 'package:neom_core/core/domain/model/app_release_item.dart';
-import 'package:neom_core/core/domain/use_cases/search_service.dart';
-import 'package:neom_core/core/utils/enums/search_type.dart';
-import 'package:neom_core/core/utils/position_utilities.dart';
+import 'package:neom_commons/utils/app_utilities.dart';
+import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
+import 'package:neom_commons/utils/text_utilities.dart';
+import 'package:neom_core/app_config.dart';
+import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
+import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
+import 'package:neom_core/data/implementations/mate_controller.dart';
+import 'package:neom_core/data/implementations/user_controller.dart';
+import 'package:neom_core/domain/model/app_media_item.dart';
+import 'package:neom_core/domain/model/app_profile.dart';
+import 'package:neom_core/domain/model/app_release_item.dart';
+import 'package:neom_core/domain/use_cases/search_service.dart';
+import 'package:neom_core/utils/enums/search_type.dart';
+import 'package:neom_core/utils/position_utilities.dart';
 
 
 class AppSearchController extends GetxController implements SearchService {
@@ -24,10 +25,10 @@ class AppSearchController extends GetxController implements SearchService {
   MateController mateController = Get.put(MateController());
   ScrollController scrollController = ScrollController();
 
-  RxBool isLoading = true.obs;
-  RxString searchParam = "".obs;
+  final RxBool _isLoading = true.obs;
+  final RxMap<String, AppProfile> _filteredProfiles = <String, AppProfile>{}.obs;
 
-  RxMap<String, AppProfile> filteredProfiles = <String, AppProfile>{}.obs;
+  RxString searchParam = "".obs;
 
   Map<String, AppMediaItem> mediaItems = {};
   Map<String, AppReleaseItem> releaseItems = {};
@@ -99,8 +100,8 @@ class AppSearchController extends GetxController implements SearchService {
   void setSearchParam(String param, {bool onlyByName = false}) {
     AppConfig.logger.d("Search Param: $param, Only By Name: $onlyByName");
 
-    searchParam.value = AppUtilities.normalizeString(param);
-    filteredProfiles.value = searchParam.isEmpty ? mateController.totalProfiles
+    searchParam.value = TextUtilities.normalizeString(param);
+    _filteredProfiles.value = searchParam.isEmpty ? mateController.totalProfiles
         : onlyByName ? AppUtilities.filterByName(mateController.totalProfiles, searchParam.value)
         : AppUtilities.filterByNameOrInstrument(mateController.totalProfiles, searchParam.value);
     // Actualizamos el filtrado de media items:
@@ -134,18 +135,18 @@ class AppSearchController extends GetxController implements SearchService {
       if(mateController.profiles.isEmpty) {
         await mateController.loadProfiles(includeSelf: includeSelf);
       }
-      filteredProfiles.value.addAll(mateController.followingProfiles);
-      filteredProfiles.value.addAll(mateController.followerProfiles);
-      filteredProfiles.value.addAll(mateController.mates);
-      filteredProfiles.value.addAll(mateController.profiles);
-      AppConfig.logger.d("Filtered Profiles ${filteredProfiles.value.length}");
+      _filteredProfiles.value.addAll(mateController.followingProfiles);
+      _filteredProfiles.value.addAll(mateController.followerProfiles);
+      _filteredProfiles.value.addAll(mateController.mates);
+      _filteredProfiles.value.addAll(mateController.profiles);
+      AppConfig.logger.d("Filtered Profiles ${_filteredProfiles.value.length}");
       sortByLocation();
     } catch (e) {
       AppConfig.logger.e(e.toString());
     }
 
 
-    isLoading.value = false;
+    _isLoading.value = false;
     update([AppPageIdConstants.search]);
   }
 
@@ -160,14 +161,14 @@ class AppSearchController extends GetxController implements SearchService {
       AppConfig.logger.e(e.toString());
     }
 
-    isLoading.value = false;
+    _isLoading.value = false;
     update([AppPageIdConstants.search]);
   }
 
   @override
   void sortByLocation() {
     sortedProfileLocation.value.clear();
-    filteredProfiles.value.forEach((key, mate) {
+    _filteredProfiles.value.forEach((key, mate) {
       double distanceBetweenProfiles = PositionUtilities.distanceBetweenPositions(
           userController.profile.position!,
           mate.position!);
@@ -178,5 +179,11 @@ class AppSearchController extends GetxController implements SearchService {
 
     AppConfig.logger.d("Sortered Profiles ${sortedProfileLocation.value.length}");
   }
+
+  @override
+  bool get isLoading => _isLoading.value;
+
+  @override
+  Map<String, AppProfile> get filteredProfiles => _filteredProfiles.value;
 
 }

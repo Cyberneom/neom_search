@@ -1,2 +1,2 @@
 # neom_search
-Search for Cyberneom
+Search for Open Neom.
