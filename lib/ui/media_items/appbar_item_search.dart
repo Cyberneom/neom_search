@@ -1,11 +1,9 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
+import '../../utils/constants/search_translation_constants.dart';
 import 'app_media_item_search_controller.dart';
-
 
 class AppBarItemSearch extends StatelessWidget implements PreferredSizeWidget {
 
@@ -23,9 +21,9 @@ class AppBarItemSearch extends StatelessWidget implements PreferredSizeWidget {
         maxLines: 1,
         onChanged: (param) async => {await itemSearchController.setSearchParam(param.trim())},
         decoration: InputDecoration(
-          suffixIcon: const Icon(CupertinoIcons.search),
+          suffixIcon: const Icon(Icons.search),
           contentPadding: const EdgeInsets.all(10),
-          hintText: AppTranslationConstants.searchInApp.tr,
+          hintText: SearchTranslationConstants.searchInApp.tr,
           border: OutlineInputBorder(
             borderRadius: const BorderRadius.all(
               Radius.circular(10),

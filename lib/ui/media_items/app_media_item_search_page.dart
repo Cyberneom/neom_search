@@ -4,9 +4,6 @@ import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 
-
-
-
 import '../widgets/search_widgets.dart';
 import 'app_media_item_search_controller.dart';
 import 'appbar_item_search.dart';
@@ -19,19 +16,19 @@ class AppMediaItemSearchPage extends StatelessWidget {
     return GetBuilder<AppMediaItemSearchController>(
         id: AppPageIdConstants.mediaItemSearch,
         init: AppMediaItemSearchController(),
-        builder: (_) => Scaffold(
+        builder: (controller) => Scaffold(
           appBar: PreferredSize(
               preferredSize: const Size.fromHeight(50),
-              child: AppBarItemSearch(_)),
+              child: AppBarItemSearch(controller)),
           body: Container(
             decoration: AppTheme.appBoxDecoration,
-            child: _.isLoading.value ? const Center(child: CircularProgressIndicator())
+            child: controller.isLoading.value ? const Center(child: CircularProgressIndicator())
             : Obx(()=> ListView.builder(
               padding: const EdgeInsets.fromLTRB(0.0, 8.0, 0.0, 8.0),
-              itemCount: _.appMediaItems.length,
+              itemCount: controller.appMediaItems.length,
               itemBuilder: (context, index) {
-                AppMediaItem appMediaItem = _.appMediaItems.values.elementAt(index);
-                return buildMediaItemTile(context, appMediaItem, query: _.searchParam.value, itemlist: _.itemlist);
+                AppMediaItem appMediaItem = controller.appMediaItems.values.elementAt(index);
+                return buildMediaItemTile(context, appMediaItem, query: controller.searchParam.value, itemlist: controller.itemlist);
               },
             )),
           ),

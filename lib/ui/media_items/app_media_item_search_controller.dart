@@ -5,27 +5,25 @@ import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
 import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
-import 'package:neom_core/data/implementations/user_controller.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
 import 'package:neom_core/domain/model/band.dart';
 import 'package:neom_core/domain/model/item_list.dart';
+import 'package:neom_core/domain/use_cases/google_book_gateway_service.dart';
+import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
 import 'package:neom_core/utils/enums/app_in_use.dart';
 import 'package:neom_core/utils/enums/itemlist_type.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/media_search_type.dart';
 import 'package:neom_core/utils/enums/owner_type.dart';
-import 'package:neom_google_books/google_books/data/api_services/google_books_api.dart';
-import 'package:neom_google_books/google_books/domain/model/google_book.dart';
-import 'package:neom_google_books/google_books/utils/google_book_mapper.dart';
 
 import '../../domain/use_cases/app_media_item_search_service.dart';
 
 class AppMediaItemSearchController extends GetxController implements AppMediaItemSearchService   {
 
-  final userController = Get.find<UserController>();
+  final userServiceImpl = Get.find<UserService>();
 
   TextEditingController searchParamController = TextEditingController();
   TextEditingController nameController = TextEditingController();
@@ -49,9 +47,9 @@ class AppMediaItemSearchController extends GetxController implements AppMediaIte
     super.onInit();
     try {
 
-      profile = userController.profile;
-      band = userController.band;
-      ownerType = userController.itemlistOwner;
+      profile = userServiceImpl.profile;
+      band = userServiceImpl.band;
+      ownerType = userServiceImpl.itemlistOwnerType;
       itemlist.ownerType = ownerType;
       if(ownerType == OwnerType.profile) {
         itemlists.value = profile.itemlists ?? {};
@@ -192,11 +190,7 @@ class AppMediaItemSearchController extends GetxController implements AppMediaIte
             }
           }
 
-          List<GoogleBook> googleBooks = await GoogleBooksAPI.searchBooks(searchParam.value);
-          for (var googleBook in googleBooks) {
-            AppMediaItem book = GoogleBookMapper.toAppMediaItem(googleBook);
-            appMediaItems[book.id] = book;
-          }
+          appMediaItems.value = await Get.find<GoogleBookGatewayService>().searchBooksAsMediaItem(searchParam.value);
           break;
         default:
           break;

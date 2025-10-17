@@ -3,17 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
-import 'package:neom_commons/ui/widgets/neom_image_card.dart';
+import 'package:neom_commons/ui/widgets/images/neom_image_card.dart';
 import 'package:neom_commons/utils/constants/app_assets.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/app_properties.dart';
-import 'package:neom_core/data/implementations/app_hive_controller.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/item_list.dart';
+import 'package:neom_core/domain/use_cases/app_hive_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
+import 'package:neom_core/utils/core_utilities.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/profile_type.dart';
 import 'package:neom_core/utils/enums/verification_level.dart';
@@ -93,7 +94,8 @@ List<Widget> buildMediaTiles(AppSearchController controller, BuildContext contex
 
 List<Widget> buildReleaseTiles(AppSearchController controller, BuildContext context) {
   return controller.filteredReleaseItems.value.values.map((releaseItem) {
-    AppMediaItem convertedMediaItem = AppMediaItemMapper.fromAppReleaseItem(releaseItem);
+    MediaItemType itemType = CoreUtilities.getMediaItemType(releaseItem);
+    AppMediaItem convertedMediaItem = AppMediaItemMapper.fromAppReleaseItem(releaseItem, itemType: itemType);
     return buildMediaItemTile(context, convertedMediaItem);
   }).toList();
 }
@@ -103,7 +105,7 @@ ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem,
 
   return ListTile(
     contentPadding: const EdgeInsets.only(left: 15.0,),
-    title: Text(appMediaItem.name,
+    title: Text(TextUtilities.getMediaName(appMediaItem.name),
       style: const TextStyle(fontWeight: FontWeight.w500,),
       overflow: TextOverflow.ellipsis,
     ),
@@ -112,7 +114,7 @@ ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem,
     ),
     isThreeLine: false,
     leading: NeomImageCard(
-        placeholderImage: const AssetImage(AppAssets.audioPlayerCover),
+        placeholderImage: const AssetImage(AppAssets.mainItemCover),
         imageUrl: appMediaItem.imgUrl
     ),
     onTap: () {
@@ -121,7 +123,7 @@ ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem,
       } else {
         Get.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [appMediaItem]);
       }
-      AppHiveController().addQuery(appMediaItem.name);
+      Get.find<AppHiveService>().addQuery(appMediaItem.name);
     },
   );
 }

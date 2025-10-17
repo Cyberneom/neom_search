@@ -1,15 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
-import 'package:neom_commons/utils/constants/app_translation_constants.dart';
-
-
-
+import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
 
 import '../app_search_controller.dart';
-
 
 class AppBarSearch extends StatelessWidget implements PreferredSizeWidget {
 
@@ -21,14 +16,17 @@ class AppBarSearch extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    String type = appSearchController.searchType.name;
+    String capitalizedType = type.substring(0, 1).toUpperCase() + type.substring(1);
+
     return AppBar(
       title: TextField(
         maxLines: 1,
         onChanged: (param) => appSearchController.setSearchParam(param.trim()),
         decoration: InputDecoration(
-          suffixIcon: const Icon(CupertinoIcons.search),
+          suffixIcon: const Icon(Icons.search),
           contentPadding: const EdgeInsets.all(10),
-          hintText: (AppTranslationConstants.search+appSearchController.searchType.name.capitalize).tr,
+          hintText: (AppTranslationConstants.search+capitalizedType).tr,
           border: OutlineInputBorder(
             borderRadius: const BorderRadius.all(
               Radius.circular(12.0),
