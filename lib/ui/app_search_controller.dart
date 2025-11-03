@@ -145,15 +145,25 @@ class AppSearchController extends GetxController implements SearchService {
     filteredMediaItems.value = searchParam.isEmpty
         ? mediaItems : Map.fromEntries(
         mediaItems.entries.where((entry) => entry.value.name.toLowerCase().contains(searchParam.value.toLowerCase())
-            || entry.value.artist.toLowerCase().contains(searchParam.value.toLowerCase())));
+            || entry.value.ownerName.toLowerCase().contains(searchParam.value.toLowerCase())));
   }
 
   void filterReleaseItems() {
     filteredReleaseItems.value = searchParam.isEmpty
         ? releaseItems : Map.fromEntries(
-        releaseItems.entries.where((entry) =>
-        entry.value.name.toLowerCase().contains(searchParam.value.toLowerCase())
-            || entry.value.ownerName.toLowerCase().contains(searchParam.value.toLowerCase())));
+        releaseItems.entries.where((entry) {
+
+          final item = entry.value;
+          final lowerSearch = searchParam.value.toLowerCase();
+          final lowerItemName= entry.value.name.toLowerCase();
+
+          bool nameMatch = lowerItemName.contains(lowerSearch);
+          bool ownerMatch = item.ownerName.toLowerCase().contains(lowerSearch);
+          bool categoryMatch = item.categories.any((cate) => cate.toLowerCase().contains(lowerSearch));
+
+          return nameMatch || ownerMatch || categoryMatch;
+        }
+    ));
   }
 
   @override

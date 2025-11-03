@@ -3,19 +3,21 @@ import 'package:get/get.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
+import 'package:neom_core/domain/model/app_release_item.dart';
+import 'package:neom_core/domain/model/external_item.dart';
 
 import '../widgets/search_widgets.dart';
-import 'app_media_item_search_controller.dart';
 import 'appbar_item_search.dart';
+import 'item_search_controller.dart';
 
-class AppMediaItemSearchPage extends StatelessWidget {
-  const AppMediaItemSearchPage({super.key});
+class ItemSearchPage extends StatelessWidget {
+  const ItemSearchPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<AppMediaItemSearchController>(
+    return GetBuilder<ItemSearchController>(
         id: AppPageIdConstants.mediaItemSearch,
-        init: AppMediaItemSearchController(),
+        init: ItemSearchController(),
         builder: (controller) => Scaffold(
           appBar: PreferredSize(
               preferredSize: const Size.fromHeight(50),
@@ -25,10 +27,18 @@ class AppMediaItemSearchPage extends StatelessWidget {
             child: controller.isLoading.value ? const Center(child: CircularProgressIndicator())
             : Obx(()=> ListView.builder(
               padding: const EdgeInsets.fromLTRB(0.0, 8.0, 0.0, 8.0),
-              itemCount: controller.appMediaItems.length,
+              itemCount: controller.foundItems.length,
               itemBuilder: (context, index) {
-                AppMediaItem appMediaItem = controller.appMediaItems.values.elementAt(index);
-                return buildMediaItemTile(context, appMediaItem, query: controller.searchParam.value, itemlist: controller.itemlist);
+                dynamic foundItem = controller.foundItems.values.elementAt(index);
+                Widget tile = const SizedBox.shrink();
+                if(foundItem is AppReleaseItem) {
+                  tile = buildReleaseItemTile(context, foundItem);
+                } else if(foundItem is AppMediaItem) {
+                  tile = buildMediaItemTile(context, foundItem);
+                } else if(foundItem is ExternalItem) {
+                  tile = buildExternalItemTile(context, foundItem);
+                }
+                return tile;
               },
             )),
           ),

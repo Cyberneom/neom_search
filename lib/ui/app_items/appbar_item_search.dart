@@ -3,11 +3,11 @@ import 'package:get/get.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import '../../utils/constants/search_translation_constants.dart';
-import 'app_media_item_search_controller.dart';
+import 'item_search_controller.dart';
 
 class AppBarItemSearch extends StatelessWidget implements PreferredSizeWidget {
 
-  final AppMediaItemSearchController itemSearchController;
+  final ItemSearchController itemSearchController;
   const AppBarItemSearch(this.itemSearchController, {super.key});
   
   @override
