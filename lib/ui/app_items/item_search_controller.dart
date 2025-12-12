@@ -1,3 +1,5 @@
+// ignore_for_file: unused_import
+
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:neom_commons/utils/app_utilities.dart';

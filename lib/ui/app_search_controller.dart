@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
@@ -17,6 +18,8 @@ import 'package:neom_core/domain/use_cases/search_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/enums/search_type.dart';
 import 'package:neom_core/utils/position_utilities.dart';
+
+import '../utils/constants/search_constants.dart';
 
 
 class AppSearchController extends GetxController implements SearchService {
@@ -38,6 +41,11 @@ class AppSearchController extends GetxController implements SearchService {
   Rx<SplayTreeMap<double, AppProfile>> sortedProfileLocation = SplayTreeMap<double, AppProfile>().obs;
 
   SearchType searchType = SearchType.profiles;
+
+  Rxn<SearchType> moreResultsType = Rxn<SearchType>();
+  RxInt moreResultsQty = 0.obs;
+
+  Timer? _debounce;
 
   @override
   void onInit() {
@@ -79,60 +87,82 @@ class AppSearchController extends GetxController implements SearchService {
 
   Future<void> loadSearchInfo() async {
     AppConfig.logger.i("Search Type: $searchType");
+    _isLoading.value = true; // Asegura que empiece cargando
 
-    switch(searchType) {
-      case SearchType.profiles:
-        await loadProfiles();
-        break;
-      case SearchType.bands:
-        break;
-      case SearchType.events:
-        break;
-      case SearchType.mediaItems:
-        await loadMediaItems();
-      case SearchType.releaseItems:
-        await loadReleaseItems();
-      case SearchType.any:
-        await loadMediaItems();
-        await loadProfiles();
-        await loadReleaseItems();
-        break;
+    try {
+      // OPTIMIZACIÓN 1: Carga Paralela
+      // Ejecutamos todo simultáneamente.
+      List<Future> tasks = [];
+
+      switch(searchType) {
+        case SearchType.profiles:
+          tasks.add(loadProfiles());
+          break;
+        case SearchType.mediaItems:
+          tasks.add(loadMediaItems());
+          break;
+        case SearchType.releaseItems:
+          tasks.add(loadReleaseItems());
+          break;
+        case SearchType.any:
+        // Disparamos las 3 peticiones a la vez
+          tasks.add(loadMediaItems());
+          tasks.add(loadProfiles());
+          tasks.add(loadReleaseItems());
+          break;
+        default:
+          break;
+      }
+
+      // Esperamos a que el bloque paralelo termine
+      await Future.wait(tasks);
+
+      setSearchParam("");
+
+    } catch (e) {
+      AppConfig.logger.e("Error loading search info: $e");
+    } finally {
+      _isLoading.value = false; // Se apaga el loading pase lo que pase
     }
 
-    setSearchParam("");
-
-    _isLoading.value = false;
-    // update([AppPageIdConstants.search]);
   }
 
   @override
   void setSearchParam(String param, {bool onlyByName = false}) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
     AppConfig.logger.t("Search Param: $param, Only By Name: $onlyByName");
 
-    searchParam.value = TextUtilities.normalizeString(param);
+    _debounce = Timer(const Duration(milliseconds: 300), () {
 
-    switch(searchType) {
-      case SearchType.profiles:
-        filterProfiles(onlyByName: onlyByName);
-        sortByLocation();
-        break;
-      case SearchType.bands:
-        break;
-      case SearchType.events:
-        break;
-      case SearchType.mediaItems:
-        filterMediaItems();
-      case SearchType.releaseItems:
-        filterReleaseItems();
-      case SearchType.any:
-        filterProfiles(onlyByName: onlyByName);
-        filterMediaItems();
-        filterReleaseItems();
-        sortByLocation();
-        break;
-    }
+      searchParam.value = TextUtilities.normalizeString(param);
+      AppConfig.logger.t("Filtering for: ${searchParam.value}");
 
-    update([AppPageIdConstants.search]);
+      switch(searchType) {
+        case SearchType.profiles:
+          filterProfiles(onlyByName: onlyByName);
+          sortByLocation();
+          break;
+        case SearchType.bands:
+          break;
+        case SearchType.events:
+          break;
+        case SearchType.mediaItems:
+          filterMediaItems();
+          break; // Faltaba break aquí
+        case SearchType.releaseItems:
+          filterReleaseItems();
+          break; // Faltaba break aquí
+        case SearchType.any:
+          filterProfiles(onlyByName: onlyByName);
+          filterMediaItems();
+          filterReleaseItems();
+          sortByLocation();
+          break;
+      }
+
+      update([AppPageIdConstants.search]);
+    });
+
   }
 
   void filterProfiles({bool onlyByName = false}) {
@@ -215,17 +245,30 @@ class AppSearchController extends GetxController implements SearchService {
 
   @override
   void sortByLocation() {
-    sortedProfileLocation.value.clear();
+    AppConfig.logger.t("Sorting Profiles by Location");
+
+    if(_filteredProfiles.isEmpty) {
+      sortedProfileLocation.value.clear();
+      return;
+    }
+
+    // Cacheamos la posición del usuario para no acceder al getter en cada iteración del loop
+    final userPos = userServiceImpl.profile.position;
+    if(userPos == null) return;
+
+    Map<double, AppProfile> tempMap = {};
+
     _filteredProfiles.value.forEach((key, mate) {
-      double distanceBetweenProfiles = PositionUtilities.distanceBetweenPositions(
-          userServiceImpl.profile.position!,
-          mate.position!);
+        if (mate.position != null) {
+          double distance = PositionUtilities.distanceBetweenPositions(userPos, mate.position!);
+          // Evitar colisiones de claves en el TreeMap
+          distance = distance + (Random().nextDouble() * 0.01);
+          tempMap[distance] = mate;
+        }
+      });
 
-      distanceBetweenProfiles = distanceBetweenProfiles + Random().nextDouble();
-      sortedProfileLocation.value[distanceBetweenProfiles] = mate;
-    });
-
-    AppConfig.logger.t("Sortered Profiles ${sortedProfileLocation.value.length}");
+      sortedProfileLocation.value = SplayTreeMap.from(tempMap);
+      AppConfig.logger.t("Sorted Profiles: ${sortedProfileLocation.value.length}");
   }
 
   @override
@@ -233,5 +276,37 @@ class AppSearchController extends GetxController implements SearchService {
 
   @override
   Map<String, AppProfile> get filteredProfiles => _filteredProfiles.value;
+
+  void showMoreResults(SearchType type, {int qty = 10}) {
+    if (moreResultsType.value == type) {
+      moreResultsQty.value += qty; // Aumentamos la cantidad a mostrar
+    } else {
+      // Si es una categoría nueva, reseteamos la cantidad y cambiamos el tipo
+      moreResultsType.value = type;
+      moreResultsQty.value = qty;
+    }
+  }
+
+  int getChildTypeCount(int length, SearchType type) {
+    AppConfig.logger.d("Getting child count for type $type with length $length");
+
+    int count = length;
+
+    if(length > SearchConstants.itemsQty) {
+      AppConfig.logger.t("Length $length is greater than itemsQty ${SearchConstants.itemsQty}");
+      if(moreResultsType.value == type) {
+        AppConfig.logger.t("More results type matches current type: ${moreResultsType.value}");
+        if(length > SearchConstants.itemsQty + moreResultsQty.value) {
+          count = SearchConstants.itemsQty + moreResultsQty.value;
+        } else {
+          count = length;
+        }
+      } else {
+        count = SearchConstants.itemsQty;
+      }
+    }
+
+    return count;
+  }
 
 }

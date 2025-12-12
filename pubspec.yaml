@@ -1,6 +1,6 @@
 name: neom_search
 description: Search for Open Neom.
-version: 1.1.0
+version: 1.2.0
 homepage: https://github.com/Cyberneom/neom_search
 publish_to: 'none'
 
