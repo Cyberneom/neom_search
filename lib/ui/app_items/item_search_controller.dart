@@ -1,7 +1,7 @@
 // ignore_for_file: unused_import
 
 import 'package:flutter/cupertino.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
@@ -25,9 +25,9 @@ import 'package:neom_core/utils/enums/owner_type.dart';
 
 import '../../domain/use_cases/app_media_item_search_service.dart';
 
-class ItemSearchController extends GetxController implements ItemSearchService {
+class ItemSearchController extends SintController implements ItemSearchService {
 
-  final userServiceImpl = Get.find<UserService>();
+  final userServiceImpl = Sint.find<UserService>();
 
   TextEditingController searchParamController = TextEditingController();
   TextEditingController nameController = TextEditingController();
@@ -67,17 +67,17 @@ class ItemSearchController extends GetxController implements ItemSearchService {
         itemlists.value = band.itemlists ?? {};
       }
 
-      if(Get.arguments != null) {
-        if(Get.arguments[0] is MediaSearchType) {
-          searchType = Get.arguments[0] as MediaSearchType;
-          if(Get.arguments.length == 2) {
+      if(Sint.arguments != null) {
+        if(Sint.arguments[0] is MediaSearchType) {
+          searchType = Sint.arguments[0] as MediaSearchType;
+          if(Sint.arguments.length == 2) {
             switch(searchType) {
               case(MediaSearchType.song):
               case(MediaSearchType.book):
-                itemlist =  Get.arguments[1] as Itemlist;
+                itemlist =  Sint.arguments[1] as Itemlist;
                 break;
               case(MediaSearchType.playlist):
-                await initSearchParam(Get.arguments[1] as String);
+                await initSearchParam(Sint.arguments[1] as String);
                 break;
               default:
                 break;
@@ -198,7 +198,7 @@ class ItemSearchController extends GetxController implements ItemSearchService {
             }
           }
 
-          foundExternalItems.value = await Get.find<GoogleBookGatewayService>().searchBooksAsExternalItem(searchParam.value);
+          foundExternalItems.value = await Sint.find<GoogleBookGatewayService>().searchBooksAsExternalItem(searchParam.value);
 
           for (var value in foundExternalItems.value.values) {
             if(value.name.toLowerCase().contains(searchParam.value)

@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
@@ -22,9 +22,9 @@ import 'package:neom_core/utils/position_utilities.dart';
 import '../utils/constants/search_constants.dart';
 
 
-class AppSearchController extends GetxController implements SearchService {
+class AppSearchController extends SintController implements SearchService {
 
-  final userServiceImpl = Get.find<UserService>();
+  final userServiceImpl = Sint.find<UserService>();
   MateService? mateServiceImpl;
   ScrollController scrollController = ScrollController();
 
@@ -53,7 +53,7 @@ class AppSearchController extends GetxController implements SearchService {
     AppConfig.logger.i("Search Controller Init");
 
     try {
-      final args = Get.arguments;
+      final args = Sint.arguments;
       if(args is List && args.isNotEmpty) {
 
         final firstArg = args[0];
@@ -63,7 +63,7 @@ class AppSearchController extends GetxController implements SearchService {
       }
 
       if(searchType == SearchType.profiles || searchType == SearchType.any) {
-        mateServiceImpl = Get.find<MateService>();
+        mateServiceImpl = Sint.find<MateService>();
       }
 
       loadSearchInfo();

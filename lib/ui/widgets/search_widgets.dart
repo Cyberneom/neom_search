@@ -1,6 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/images/neom_image_card.dart';
@@ -27,7 +27,7 @@ List<Widget> buildMateTiles(List<AppProfile> mates, BuildContext context) {
         ? GestureDetector(
       child: ListTile(
         onTap: () => mate.id.isNotEmpty
-            ? Get.toNamed(AppRouteConstants.mateDetails, arguments: mate.id)
+            ? Sint.toNamed(AppRouteConstants.mateDetails, arguments: mate.id)
             : {},
         leading: CachedNetworkImage(
           imageUrl: mate.photoUrl.isNotEmpty
@@ -90,7 +90,7 @@ Widget buildMateTile(AppProfile mate, BuildContext context) {
       ? GestureDetector(
     child: ListTile(
       onTap: () => mate.id.isNotEmpty
-          ? Get.toNamed(AppRouteConstants.mateDetails, arguments: mate.id)
+          ? Sint.toNamed(AppRouteConstants.mateDetails, arguments: mate.id)
           : {},
       leading: CachedNetworkImage(
         imageUrl: mate.photoUrl.isNotEmpty
@@ -177,11 +177,11 @@ ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem) {
       if(appMediaItem.type == MediaItemType.song
           || appMediaItem.type == MediaItemType.podcast
           || appMediaItem.type == MediaItemType.audiobook) {
-        Get.toNamed(AppRouteConstants.audioPlayerMedia, arguments: [appMediaItem]);
+        Sint.toNamed(AppRouteConstants.audioPlayerMedia, arguments: [appMediaItem]);
       } else {
-        Get.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [appMediaItem]);
+        Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [appMediaItem]);
       }
-      Get.find<AppHiveService>().addQuery(appMediaItem.name);
+      Sint.find<AppHiveService>().addQuery(appMediaItem.name);
     },
   );
 }
@@ -202,8 +202,8 @@ ListTile buildReleaseItemTile(BuildContext context, AppReleaseItem releaseItem) 
         imageUrl: releaseItem.imgUrl
     ),
     onTap: () {
-      Get.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [releaseItem]);
-      Get.find<AppHiveService>().addQuery(releaseItem.name);
+      Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [releaseItem]);
+      Sint.find<AppHiveService>().addQuery(releaseItem.name);
     },
   );
 }
@@ -224,8 +224,8 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
       imageUrl: externalItem.imgUrl
     ),
     onTap: () {
-      Get.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [externalItem]);
-      Get.find<AppHiveService>().addQuery(externalItem.name);
+      Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [externalItem]);
+      Sint.find<AppHiveService>().addQuery(externalItem.name);
     },
   );
 }
@@ -268,11 +268,11 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
 //     ),
 //     onTap: () {
 //       if(itemType == MediaItemType.song) {
-//         Get.toNamed(AppRouteConstants.audioPlayerMedia, arguments: [foundItem]);
+//         Sint.toNamed(AppRouteConstants.audioPlayerMedia, arguments: [foundItem]);
 //       } else {
-//         Get.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [foundItem]);
+//         Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [foundItem]);
 //       }
-//       Get.find<AppHiveService>().addQuery(itemName);
+//       Sint.find<AppHiveService>().addQuery(itemName);
 //     },
 //   );
 // }

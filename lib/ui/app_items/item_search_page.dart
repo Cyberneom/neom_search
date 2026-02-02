@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
@@ -15,7 +15,7 @@ class ItemSearchPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<ItemSearchController>(
+    return SintBuilder<ItemSearchController>(
         id: AppPageIdConstants.mediaItemSearch,
         init: ItemSearchController(),
         builder: (controller) => Scaffold(
