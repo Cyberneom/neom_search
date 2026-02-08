@@ -3,7 +3,6 @@ import 'dart:collection';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
@@ -18,6 +17,7 @@ import 'package:neom_core/domain/use_cases/search_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/enums/search_type.dart';
 import 'package:neom_core/utils/position_utilities.dart';
+import 'package:sint/sint.dart';
 
 import '../utils/constants/search_constants.dart';
 
@@ -50,7 +50,7 @@ class AppSearchController extends SintController implements SearchService {
   @override
   void onInit() {
     super.onInit();
-    AppConfig.logger.i("Search Controller Init");
+    AppConfig.logger.d("Search Controller Init");
 
     try {
       final args = Sint.arguments;
@@ -76,13 +76,15 @@ class AppSearchController extends SintController implements SearchService {
   @override
   void onReady() {
     super.onReady();
+    AppConfig.logger.i("Search Controller Ready");
 
-    try {
+  }
 
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
-    }
-
+  @override
+  void onClose() {
+    _debounce?.cancel();
+    scrollController.dispose();
+    super.onClose();
   }
 
   Future<void> loadSearchInfo() async {

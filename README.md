@@ -1,4 +1,8 @@
 # neom_search
+
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Open-Neom/neom_search)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+
 neom_search is a core module within the Open Neom ecosystem, dedicated to providing
 comprehensive search functionalities across various data types within the application.
 It enables users to efficiently discover profiles, media items (songs, releases, books),

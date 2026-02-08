@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
+import 'package:sint/sint.dart';
+
 import '../../utils/constants/search_translation_constants.dart';
 import 'item_search_controller.dart';
 

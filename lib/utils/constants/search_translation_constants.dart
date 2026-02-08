@@ -6,4 +6,7 @@ class SearchTranslationConstants {
   static const String searchResults = 'searchResults';
   static const String searchedText = 'searchedText';
 
+  // Favorite songs
+  static const String favoriteSongs = 'favoriteSongs';
+
 }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
 import 'package:neom_core/domain/model/external_item.dart';
+import 'package:sint/sint.dart';
 
 import '../widgets/search_widgets.dart';
 import 'appbar_item_search.dart';

@@ -1,7 +1,6 @@
 // ignore_for_file: unused_import
 
 import 'package:flutter/cupertino.dart';
-import 'package:sint/sint.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
@@ -22,6 +21,7 @@ import 'package:neom_core/utils/enums/itemlist_type.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/media_search_type.dart';
 import 'package:neom_core/utils/enums/owner_type.dart';
+import 'package:sint/sint.dart';
 
 import '../../domain/use_cases/app_media_item_search_service.dart';
 
