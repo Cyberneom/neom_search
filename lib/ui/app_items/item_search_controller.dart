@@ -21,6 +21,7 @@ import 'package:neom_core/utils/enums/itemlist_type.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/media_search_type.dart';
 import 'package:neom_core/utils/enums/owner_type.dart';
+import 'package:neom_itemlists/utils/itemlist_utilities.dart';
 import 'package:sint/sint.dart';
 
 import '../../domain/use_cases/app_media_item_search_service.dart';
@@ -86,15 +87,7 @@ class ItemSearchController extends SintController implements ItemSearchService {
         }
       }
 
-      switch(itemlist.type) {
-        case ItemlistType.readlist:
-          searchType = MediaSearchType.book;
-        case ItemlistType.playlist:
-        case ItemlistType.podcast:
-          searchType = MediaSearchType.song;
-        default:
-          searchType = MediaSearchType.song;
-      }
+      searchType = ItemlistUtilities.getMediaSearchType(itemlist.type);
 
     } catch (e) {
       AppConfig.logger.e(e.toString());

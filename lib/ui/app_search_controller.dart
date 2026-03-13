@@ -78,6 +78,32 @@ class AppSearchController extends SintController implements SearchService {
     super.onReady();
     AppConfig.logger.i("Search Controller Ready");
 
+    // URL query params for web deep links
+    // Supports both EN and ES param names: type/tipo, q/buscar
+    final typeParam = Sint.queryParam('type') ?? Sint.queryParam('tipo');
+
+    // Type aliases: ES → enum name
+    const typeAliases = <String, String>{
+      'perfiles': 'profiles', 'bandas': 'bands', 'eventos': 'events',
+      'canciones': 'mediaItems', 'musica': 'mediaItems',
+      'lanzamientos': 'releaseItems', 'todos': 'any', 'todo': 'any',
+    };
+
+    if (typeParam != null) {
+      final normalized = typeAliases[typeParam.toLowerCase()] ?? typeParam.toLowerCase();
+      final parsed = SearchType.values.where(
+        (e) => e.name.toLowerCase() == normalized,
+      ).firstOrNull;
+      if (parsed != null) searchType = parsed;
+    }
+
+    final qParam = Sint.queryParam('q') ?? Sint.queryParam('buscar');
+    if (qParam != null && qParam.isNotEmpty) {
+      // Defer to allow loadSearchInfo to complete first
+      Future.delayed(const Duration(milliseconds: 500), () {
+        setSearchParam(qParam);
+      });
+    }
   }
 
   @override
@@ -171,6 +197,7 @@ class AppSearchController extends SintController implements SearchService {
     _filteredProfiles.value = searchParam.isEmpty ? mateServiceImpl?.totalProfiles ?? {}
         : onlyByName ? AppUtilities.filterByName(mateServiceImpl?.totalProfiles ?? {}, searchParam.value)
         : AppUtilities.filterByNameOrInstrument(mateServiceImpl?.totalProfiles ?? {}, searchParam.value);
+    AppConfig.logger.t("Filtered Profiles: ${_filteredProfiles.value.length}");
   }
 
   void filterMediaItems() {
@@ -204,7 +231,7 @@ class AppSearchController extends SintController implements SearchService {
     try {
 
       if(mateServiceImpl?.profiles.isEmpty ?? true) {
-        await mateServiceImpl?.loadProfiles(includeSelf: includeSelf);
+        await mateServiceImpl?.loadProfiles(includeSelf: includeSelf, loadAll: true);
       }
       _filteredProfiles.value.addAll(mateServiceImpl?.followingProfiles ?? {});
       _filteredProfiles.value.addAll(mateServiceImpl?.followerProfiles ?? {});
@@ -247,7 +274,7 @@ class AppSearchController extends SintController implements SearchService {
 
   @override
   void sortByLocation() {
-    AppConfig.logger.t("Sorting Profiles by Location");
+    AppConfig.logger.t("Sorting ${_filteredProfiles.length} Profiles by Location");
 
     if(_filteredProfiles.isEmpty) {
       sortedProfileLocation.value.clear();
@@ -256,11 +283,12 @@ class AppSearchController extends SintController implements SearchService {
 
     // Cacheamos la posición del usuario para no acceder al getter en cada iteración del loop
     final userPos = userServiceImpl.profile.position;
-    if(userPos == null) return;
 
     Map<double, AppProfile> tempMap = {};
 
-    _filteredProfiles.value.forEach((key, mate) {
+    if(userPos != null) {
+      // Ordenar por distancia al usuario
+      _filteredProfiles.value.forEach((key, mate) {
         if (mate.position != null) {
           double distance = PositionUtilities.distanceBetweenPositions(userPos, mate.position!);
           // Evitar colisiones de claves en el TreeMap
@@ -268,10 +296,31 @@ class AppSearchController extends SintController implements SearchService {
           tempMap[distance] = mate;
         }
       });
+    }
 
-      sortedProfileLocation.value = SplayTreeMap.from(tempMap);
-      AppConfig.logger.t("Sorted Profiles: ${sortedProfileLocation.value.length}");
+    // Fallback: perfiles sin posición (o sin geolocación del usuario)
+    // Los agregamos al final con claves altas para que queden después de los ordenados
+    if(tempMap.length < _filteredProfiles.length) {
+      double fallbackKey = (tempMap.isEmpty ? 0 : tempMap.keys.last) + 1000;
+      // Ordenar alfabéticamente los que no tienen posición o cuando no hay geolocación
+      final remaining = userPos != null
+          ? _filteredProfiles.value.entries.where((e) => e.value.position == null).toList()
+          : _filteredProfiles.value.entries.toList();
+      remaining.sort((a, b) => a.value.name.toLowerCase().compareTo(b.value.name.toLowerCase()));
+      for (final entry in remaining) {
+        if(!tempMap.containsValue(entry.value)) {
+          tempMap[fallbackKey] = entry.value;
+          fallbackKey += 1;
+        }
+      }
+    }
+
+    sortedProfileLocation.value = SplayTreeMap.from(tempMap);
+    AppConfig.logger.t("Sorted Profiles: ${sortedProfileLocation.value.length}");
   }
+
+  /// Whether the user has geolocation available (profiles sorted by distance)
+  bool get hasUserPosition => userServiceImpl.profile.position != null;
 
   @override
   bool get isLoading => _isLoading.value;
@@ -295,7 +344,7 @@ class AppSearchController extends SintController implements SearchService {
     int count = length;
 
     if(length > SearchConstants.itemsQty) {
-      AppConfig.logger.t("Length $length is greater than itemsQty ${SearchConstants.itemsQty}");
+      AppConfig.logger.t("Length $length for ${type.name} is greater than itemsQty ${SearchConstants.itemsQty}");
       if(moreResultsType.value == type) {
         AppConfig.logger.t("More results type matches current type: ${moreResultsType.value}");
         if(length > SearchConstants.itemsQty + moreResultsQty.value) {

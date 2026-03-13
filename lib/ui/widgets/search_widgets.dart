@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:neom_commons/app_flavour.dart';
+import 'package:neom_commons/ui/widgets/custom_image.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/images/neom_image_card.dart';
 import 'package:neom_commons/utils/constants/app_assets.dart';
@@ -25,23 +25,11 @@ Widget buildMateTile(AppProfile mate, BuildContext context) {
       ? GestureDetector(
     child: ListTile(
       onTap: () => mate.id.isNotEmpty
-          ? Sint.toNamed(AppRouteConstants.mateDetails, arguments: mate.id)
+          ? Sint.toNamed(AppRouteConstants.matePath(mate.id), arguments: mate.id)
           : {},
-      leading: CachedNetworkImage(
-        imageUrl: mate.photoUrl.isNotEmpty
-            ? mate.photoUrl
-            : AppProperties.getAppLogoUrl(),
-        placeholder: (context, url) => const CircleAvatar(
-          child: CircularProgressIndicator(),
-        ),
-        errorWidget: (context, url, error) {
-          AppConfig.logger.w("Error loading image: $error");
-          return CircleAvatar(
-            backgroundImage: CachedNetworkImageProvider(AppProperties.getAppLogoUrl()),
-          );
-        },
-        imageBuilder: (context, imageProvider) => CircleAvatar(
-          backgroundImage: imageProvider,
+      leading: CircleAvatar(
+        backgroundImage: platformImageProvider(
+          mate.photoUrl.isNotEmpty ? mate.photoUrl : AppProperties.getAppLogoUrl(),
         ),
       ),
       title: Row(
@@ -104,7 +92,7 @@ ListTile buildMediaItemTile(BuildContext context, AppMediaItem appMediaItem) {
           || appMediaItem.type == MediaItemType.audiobook) {
         Sint.toNamed(AppRouteConstants.audioPlayerMedia, arguments: [appMediaItem]);
       } else {
-        Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [appMediaItem]);
+        Sint.toNamed(AppFlavour.getMainItemDetailsRoute(appMediaItem.id), arguments: [appMediaItem]);
       }
       Sint.find<AppHiveService>().addQuery(appMediaItem.name);
     },
@@ -129,7 +117,7 @@ ListTile buildReleaseItemTile(BuildContext context, AppReleaseItem releaseItem) 
         imageUrl: releaseItem.imgUrl
     ),
     onTap: () {
-      Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [releaseItem]);
+      Sint.toNamed(AppFlavour.getMainItemDetailsRoute(releaseItem.id), arguments: [releaseItem]);
       Sint.find<AppHiveService>().addQuery(releaseItem.name);
     },
   );
@@ -153,7 +141,7 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
       imageUrl: externalItem.imgUrl
     ),
     onTap: () {
-      Sint.toNamed(AppFlavour.getMainItemDetailsRoute(), arguments: [externalItem]);
+      Sint.toNamed(AppFlavour.getMainItemDetailsRoute(externalItem.id), arguments: [externalItem]);
       Sint.find<AppHiveService>().addQuery(externalItem.name);
     },
   );

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
+import 'package:neom_commons/ui/widgets/web_content_wrapper.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
 import 'package:neom_core/utils/enums/search_type.dart';
@@ -8,6 +10,7 @@ import 'package:sint/sint.dart';
 
 import '../utils/constants/search_constants.dart';
 import 'app_search_controller.dart';
+import 'web/search_web_page.dart';
 import 'widgets/appbar_search.dart';
 import 'widgets/search_widgets.dart';
 
@@ -20,19 +23,28 @@ class AppSearchPage extends StatelessWidget {
     return SintBuilder<AppSearchController>(
       id: AppPageIdConstants.search,
       init: AppSearchController(),
-      builder: (controller) => Scaffold(
+      builder: (controller) {
+        if (kIsWeb) return SearchWebPage(controller: controller);
+        return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(50),
         child: AppBarSearch(controller)
       ),
       backgroundColor: AppFlavour.getBackgroundColor(),
-      body: Obx(() => Container(
+      body: WebContentWrapper(
+        maxWidth: 750,
+        padding: EdgeInsets.zero,
+        child: Obx(() => Container(
         decoration: AppTheme.appBoxDecoration,
         child: controller.isLoading ? const Center(child: CircularProgressIndicator())
             : CustomScrollView(
           slivers: [
             if(controller.sortedProfileLocation.value.isNotEmpty)
-              _buildSliverSectionHeader(context, AppTranslationConstants.nearProfiles.tr),
+              _buildSliverSectionHeader(context,
+                controller.hasUserPosition
+                    ? AppTranslationConstants.nearProfiles.tr
+                    : AppTranslationConstants.profiles.tr,
+              ),
             if(controller.sortedProfileLocation.value.isNotEmpty)
             SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -133,7 +145,7 @@ class AppSearchPage extends StatelessWidget {
         ///   : ListView(
         /// children: buildCombinedSearchList(controller, context)
         )
-      ),)
+      ),),);},
     );
   }
 

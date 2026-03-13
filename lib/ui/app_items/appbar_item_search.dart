@@ -33,7 +33,7 @@ class AppBarItemSearch extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
-      backgroundColor: AppColor.appBar,
+      backgroundColor: AppColor.surfaceElevated,
       elevation: 5,
     );
   }
