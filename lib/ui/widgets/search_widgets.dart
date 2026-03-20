@@ -27,10 +27,8 @@ Widget buildMateTile(AppProfile mate, BuildContext context) {
       onTap: () => mate.id.isNotEmpty
           ? Sint.toNamed(AppRouteConstants.matePath(mate.id), arguments: mate.id)
           : {},
-      leading: CircleAvatar(
-        backgroundImage: platformImageProvider(
-          mate.photoUrl.isNotEmpty ? mate.photoUrl : AppProperties.getAppLogoUrl(),
-        ),
+      leading: platformCircleAvatar(
+        imageUrl: mate.photoUrl.isNotEmpty ? mate.photoUrl : AppProperties.getAppLogoUrl(),
       ),
       title: Row(
         children: [

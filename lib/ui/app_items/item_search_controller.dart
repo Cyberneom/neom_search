@@ -5,6 +5,7 @@ import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
 import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
@@ -89,8 +90,8 @@ class ItemSearchController extends SintController implements ItemSearchService {
 
       searchType = ItemlistUtilities.getMediaSearchType(itemlist.type);
 
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'onInit');
     }
   }
 
@@ -115,8 +116,8 @@ class ItemSearchController extends SintController implements ItemSearchService {
 
     try {
       await searchItems();
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'initSearchParam');
     }
 
     update([AppPageIdConstants.mediaItemSearch]);
@@ -130,8 +131,8 @@ class ItemSearchController extends SintController implements ItemSearchService {
     searchParam.value = text;
     try {
       await searchItems();
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'setSearchParam');
     }
 
     update([AppPageIdConstants.mediaItemSearch]);
@@ -203,8 +204,8 @@ class ItemSearchController extends SintController implements ItemSearchService {
         default:
           break;
       }
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'searchItems');
     }
 
     update([AppPageIdConstants.mediaItemSearch]);

@@ -7,6 +7,7 @@ import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
 import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
@@ -67,8 +68,8 @@ class AppSearchController extends SintController implements SearchService {
       }
 
       loadSearchInfo();
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'onInit');
     }
 
   }
@@ -147,8 +148,8 @@ class AppSearchController extends SintController implements SearchService {
 
       setSearchParam("");
 
-    } catch (e) {
-      AppConfig.logger.e("Error loading search info: $e");
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadSearchInfo');
     } finally {
       _isLoading.value = false; // Se apaga el loading pase lo que pase
     }
@@ -239,8 +240,8 @@ class AppSearchController extends SintController implements SearchService {
       _filteredProfiles.value.addAll(mateServiceImpl?.profiles ?? {});
       AppConfig.logger.d("Filtered Profiles ${_filteredProfiles.value.length}");
       sortByLocation();
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadProfiles');
     }
 
 
@@ -254,8 +255,8 @@ class AppSearchController extends SintController implements SearchService {
 
     try {
       mediaItems = await AppMediaItemFirestore().fetchAll();
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadMediaItems');
     }
 
   }
@@ -266,8 +267,8 @@ class AppSearchController extends SintController implements SearchService {
 
     try {
       releaseItems = await AppReleaseItemFirestore().retrieveAll();
-    } catch (e) {
-      AppConfig.logger.e(e.toString());
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadReleaseItems');
     }
 
   }
