@@ -85,7 +85,7 @@ class AppSearchController extends SintController implements SearchService {
 
     // Type aliases: ES → enum name
     const typeAliases = <String, String>{
-      'perfiles': 'profiles', 'bandas': 'bands', 'eventos': 'events',
+      'perfiles': 'profiles', 'colectivos': 'collectives', 'eventos': 'events',
       'canciones': 'mediaItems', 'musica': 'mediaItems',
       'lanzamientos': 'releaseItems', 'todos': 'any', 'todo': 'any',
     };
@@ -171,7 +171,7 @@ class AppSearchController extends SintController implements SearchService {
           filterProfiles(onlyByName: onlyByName);
           sortByLocation();
           break;
-        case SearchType.bands:
+        case SearchType.collectives:
           break;
         case SearchType.events:
           break;

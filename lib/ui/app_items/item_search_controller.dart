@@ -11,7 +11,7 @@ import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
-import 'package:neom_core/domain/model/band.dart';
+import 'package:neom_core/domain/model/collective.dart';
 import 'package:neom_core/domain/model/external_item.dart';
 import 'package:neom_core/domain/model/item_list.dart';
 import 'package:neom_core/domain/use_cases/google_book_gateway_service.dart';
@@ -49,7 +49,7 @@ class ItemSearchController extends SintController implements ItemSearchService {
   final RxString searchParam = "".obs;
 
   AppProfile profile = AppProfile();
-  Band band = Band();
+  Collective collective = Collective();
   OwnerType ownerType = OwnerType.profile;
   Itemlist itemlist = Itemlist();
   MediaSearchType searchType = MediaSearchType.song;
@@ -60,13 +60,13 @@ class ItemSearchController extends SintController implements ItemSearchService {
     try {
 
       profile = userServiceImpl.profile;
-      band = userServiceImpl.band;
+      collective = userServiceImpl.collective;
       ownerType = userServiceImpl.itemlistOwnerType;
       itemlist.ownerType = ownerType;
       if(ownerType == OwnerType.profile) {
         itemlists.value = profile.itemlists ?? {};
       } else {
-        itemlists.value = band.itemlists ?? {};
+        itemlists.value = collective.itemlists ?? {};
       }
 
       if(Sint.arguments != null) {
