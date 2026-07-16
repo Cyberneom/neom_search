@@ -195,9 +195,24 @@ class AppSearchController extends SintController implements SearchService {
   }
 
   void filterProfiles({bool onlyByName = false}) {
-    _filteredProfiles.value = searchParam.isEmpty ? mateServiceImpl?.totalProfiles ?? {}
+    final Map<String, AppProfile> candidates = searchParam.isEmpty ? mateServiceImpl?.totalProfiles ?? {}
         : onlyByName ? AppUtilities.filterByName(mateServiceImpl?.totalProfiles ?? {}, searchParam.value)
         : AppUtilities.filterByNameOrInstrument(mateServiceImpl?.totalProfiles ?? {}, searchParam.value);
+
+    final filtered = Map<String, AppProfile>.fromEntries(
+      candidates.entries.where((entry) {
+        final profile = entry.value;
+        final email = profile.email.toLowerCase().trim();
+        if (email.endsWith('@emxi.org') || 
+            email.endsWith('@gigmeout.com') || 
+            email.endsWith('@cyberneom.xyz')) {
+          return false;
+        }
+        return true;
+      })
+    );
+
+    _filteredProfiles.value = filtered;
     AppConfig.logger.t("Filtered Profiles: ${_filteredProfiles.value.length}");
   }
 

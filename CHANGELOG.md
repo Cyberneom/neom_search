@@ -1,3 +1,6 @@
+### [2.0.1] - 2026-07-16
+- Update app search controller filtering.
+
 ### 2.0.0 - Code Cleanup & Stability Improvements
 
 This release focuses on code quality, cleanup, and improved maintainability.
