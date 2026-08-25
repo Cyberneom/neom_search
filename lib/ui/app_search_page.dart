@@ -22,7 +22,8 @@ class AppSearchPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return SintBuilder<AppSearchController>(
       id: AppPageIdConstants.search,
-      init: AppSearchController(),
+      init: Sint.isRegistered<AppSearchController>() ? Sint.find<AppSearchController>() : AppSearchController(),
+      autoRemove: false,
       builder: (controller) {
         if (kIsWeb) return SearchWebPage(controller: controller);
         return Scaffold(

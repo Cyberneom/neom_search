@@ -7,7 +7,6 @@ import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
 import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
@@ -17,6 +16,7 @@ import 'package:neom_core/domain/use_cases/mate_service.dart';
 import 'package:neom_core/domain/use_cases/search_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/enums/search_type.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/utils/position_utilities.dart';
 import 'package:sint/sint.dart';
 
@@ -48,30 +48,35 @@ class AppSearchController extends SintController implements SearchService {
 
   Timer? _debounce;
 
+  MateService? get _mateService {
+    if (mateServiceImpl != null) return mateServiceImpl;
+    if (Sint.isRegistered<MateService>()) {
+      mateServiceImpl = Sint.find<MateService>();
+    }
+    return mateServiceImpl;
+  }
+
+  final Map<String, AppProfile> _allProfilesCache = {};
+
   @override
   void onInit() {
     super.onInit();
     AppConfig.logger.d("Search Controller Init");
 
     try {
+      scrollController = ScrollController();
       final args = Sint.arguments;
       if(args is List && args.isNotEmpty) {
-
         final firstArg = args[0];
         if(firstArg is SearchType) {
           searchType = firstArg;
         }
       }
 
-      if(searchType == SearchType.profiles || searchType == SearchType.any) {
-        mateServiceImpl = Sint.find<MateService>();
-      }
-
       loadSearchInfo();
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'onInit');
     }
-
   }
 
   @override
@@ -87,7 +92,7 @@ class AppSearchController extends SintController implements SearchService {
     const typeAliases = <String, String>{
       'perfiles': 'profiles', 'colectivos': 'collectives', 'eventos': 'events',
       'canciones': 'mediaItems', 'musica': 'mediaItems',
-      'lanzamientos': 'releaseItems', 'todos': 'any', 'todo': 'any',
+      'lanzamientos': 'releaseItems', 'libros': 'releaseItems', 'todos': 'any', 'todo': 'any',
     };
 
     if (typeParam != null) {
@@ -110,50 +115,32 @@ class AppSearchController extends SintController implements SearchService {
   @override
   void onClose() {
     _debounce?.cancel();
-    scrollController.dispose();
+    try {
+      scrollController.dispose();
+    } catch (_) {}
     super.onClose();
   }
 
   Future<void> loadSearchInfo() async {
     AppConfig.logger.i("Search Type: $searchType");
-    _isLoading.value = true; // Asegura que empiece cargando
+    _isLoading.value = true;
 
     try {
-      // OPTIMIZACIÓN 1: Carga Paralela
-      // Ejecutamos todo simultáneamente.
-      List<Future> tasks = [];
-
-      switch(searchType) {
-        case SearchType.profiles:
-          tasks.add(loadProfiles());
-          break;
-        case SearchType.mediaItems:
-          tasks.add(loadMediaItems());
-          break;
-        case SearchType.releaseItems:
-          tasks.add(loadReleaseItems());
-          break;
-        case SearchType.any:
-        // Disparamos las 3 peticiones a la vez
-          tasks.add(loadMediaItems());
-          tasks.add(loadProfiles());
-          tasks.add(loadReleaseItems());
-          break;
-        default:
-          break;
-      }
-
-      // Esperamos a que el bloque paralelo termine
-      await Future.wait(tasks);
+      // Always load profiles, releases and media items concurrently
+      // so switching category filters / tabs on web or mobile responds immediately
+      await Future.wait([
+        loadProfiles(),
+        loadMediaItems(),
+        loadReleaseItems(),
+      ]);
 
       setSearchParam("");
-
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadSearchInfo');
     } finally {
-      _isLoading.value = false; // Se apaga el loading pase lo que pase
+      _isLoading.value = false;
+      update([AppPageIdConstants.search]);
     }
-
   }
 
   @override
@@ -162,42 +149,36 @@ class AppSearchController extends SintController implements SearchService {
     AppConfig.logger.t("Search Param: $param, Only By Name: $onlyByName");
 
     _debounce = Timer(const Duration(milliseconds: 300), () {
-
       searchParam.value = TextUtilities.normalizeString(param);
       AppConfig.logger.t("Filtering for: ${searchParam.value}");
 
-      switch(searchType) {
-        case SearchType.profiles:
-          filterProfiles(onlyByName: onlyByName);
-          sortByLocation();
-          break;
-        case SearchType.collectives:
-          break;
-        case SearchType.events:
-          break;
-        case SearchType.mediaItems:
-          filterMediaItems();
-          break; // Faltaba break aquí
-        case SearchType.releaseItems:
-          filterReleaseItems();
-          break; // Faltaba break aquí
-        case SearchType.any:
-          filterProfiles(onlyByName: onlyByName);
-          filterMediaItems();
-          filterReleaseItems();
-          sortByLocation();
-          break;
-      }
+      // Filter all categories so count badges and tabs are always in sync
+      filterProfiles(onlyByName: onlyByName);
+      filterMediaItems();
+      filterReleaseItems();
+      sortByLocation();
 
       update([AppPageIdConstants.search]);
     });
-
   }
 
   void filterProfiles({bool onlyByName = false}) {
-    final Map<String, AppProfile> candidates = searchParam.isEmpty ? mateServiceImpl?.totalProfiles ?? {}
-        : onlyByName ? AppUtilities.filterByName(mateServiceImpl?.totalProfiles ?? {}, searchParam.value)
-        : AppUtilities.filterByNameOrInstrument(mateServiceImpl?.totalProfiles ?? {}, searchParam.value);
+    final ms = _mateService;
+    final Map<String, AppProfile> allProfiles = {};
+    if (ms != null) {
+      allProfiles.addAll(ms.totalProfiles);
+      allProfiles.addAll(ms.profiles);
+      allProfiles.addAll(ms.mates);
+      allProfiles.addAll(ms.followingProfiles);
+      allProfiles.addAll(ms.followerProfiles);
+    }
+    allProfiles.addAll(_allProfilesCache);
+
+    final Map<String, AppProfile> candidates = searchParam.isEmpty
+        ? allProfiles
+        : onlyByName
+            ? AppUtilities.filterByName(allProfiles, searchParam.value)
+            : AppUtilities.filterByNameOrInstrument(allProfiles, searchParam.value);
 
     final filtered = Map<String, AppProfile>.fromEntries(
       candidates.entries.where((entry) {
@@ -227,7 +208,6 @@ class AppSearchController extends SintController implements SearchService {
     filteredReleaseItems.value = searchParam.isEmpty
         ? releaseItems : Map.fromEntries(
         releaseItems.entries.where((entry) {
-
           final item = entry.value;
           final lowerSearch = searchParam.value.toLowerCase();
           final lowerItemName= entry.value.name.toLowerCase();
@@ -245,47 +225,46 @@ class AppSearchController extends SintController implements SearchService {
   Future<void> loadProfiles({bool includeSelf = false}) async {
     AppConfig.logger.d("Loading Profiles");
     try {
-
-      if(mateServiceImpl?.profiles.isEmpty ?? true) {
-        await mateServiceImpl?.loadProfiles(includeSelf: includeSelf, loadAll: true);
+      final ms = _mateService;
+      if (ms != null) {
+        if (ms.profiles.isEmpty && ms.totalProfiles.isEmpty) {
+          await ms.loadProfiles(includeSelf: includeSelf, loadAll: true);
+        }
+        _allProfilesCache.addAll(ms.totalProfiles);
+        _allProfilesCache.addAll(ms.profiles);
+        _allProfilesCache.addAll(ms.mates);
+        _allProfilesCache.addAll(ms.followingProfiles);
+        _allProfilesCache.addAll(ms.followerProfiles);
       }
-      _filteredProfiles.value.addAll(mateServiceImpl?.followingProfiles ?? {});
-      _filteredProfiles.value.addAll(mateServiceImpl?.followerProfiles ?? {});
-      _filteredProfiles.value.addAll(mateServiceImpl?.mates ?? {});
-      _filteredProfiles.value.addAll(mateServiceImpl?.profiles ?? {});
-      AppConfig.logger.d("Filtered Profiles ${_filteredProfiles.value.length}");
+
+      filterProfiles();
       sortByLocation();
+      AppConfig.logger.d("Filtered Profiles ${_filteredProfiles.value.length}");
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadProfiles');
     }
-
-
-    _isLoading.value = false;
-    update([AppPageIdConstants.search]);
   }
 
   @override
   Future<void> loadMediaItems() async {
     AppConfig.logger.d("Loading Media Items");
-
     try {
       mediaItems = await AppMediaItemFirestore().fetchAll();
+      filterMediaItems();
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadMediaItems');
     }
-
   }
 
   @override
   Future<void> loadReleaseItems() async {
     AppConfig.logger.d("Loading Release Items");
-
     try {
       releaseItems = await AppReleaseItemFirestore().retrieveAll();
+      filterReleaseItems();
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadReleaseItems');
     }
-
   }
 
   @override

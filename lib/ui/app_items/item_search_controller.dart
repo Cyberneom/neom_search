@@ -5,7 +5,6 @@ import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
 import 'package:neom_core/app_config.dart';
-import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
 import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
@@ -22,7 +21,7 @@ import 'package:neom_core/utils/enums/itemlist_type.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/media_search_type.dart';
 import 'package:neom_core/utils/enums/owner_type.dart';
-import 'package:neom_itemlists/utils/itemlist_utilities.dart';
+import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:sint/sint.dart';
 
 import '../../domain/use_cases/app_media_item_search_service.dart';
@@ -86,12 +85,34 @@ class ItemSearchController extends SintController implements ItemSearchService {
             }
           }
         }
+      } else if (itemlist.type != ItemlistType.playlist) {
+        searchType = _getMediaSearchType(itemlist.type);
       }
-
-      searchType = ItemlistUtilities.getMediaSearchType(itemlist.type);
 
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'onInit');
+    }
+  }
+
+  static MediaSearchType _getMediaSearchType(ItemlistType itemlistType) {
+    switch(itemlistType) {
+      case ItemlistType.playlist:
+      case ItemlistType.single:
+      case ItemlistType.ep:
+      case ItemlistType.album:
+      case ItemlistType.demo:
+      case ItemlistType.radioStation:
+      case ItemlistType.giglist:
+        return MediaSearchType.song;
+      case ItemlistType.podcast:
+        return MediaSearchType.podcast;
+      case ItemlistType.readlist:
+      case ItemlistType.publication:
+        return MediaSearchType.book;
+      case ItemlistType.audiobook:
+        return MediaSearchType.audiobook;
+      case ItemlistType.meditation:
+        return MediaSearchType.meditation;
     }
   }
 

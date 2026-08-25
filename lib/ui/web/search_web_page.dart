@@ -24,7 +24,7 @@ class SearchWebPage extends StatefulWidget {
 
 class _SearchWebPageState extends State<SearchWebPage> {
 
-  SearchType _activeFilter = SearchType.any;
+  late SearchType _activeFilter;
   final _searchFocusNode = FocusNode();
 
   static const _filterCycle = [
@@ -33,6 +33,12 @@ class _SearchWebPageState extends State<SearchWebPage> {
     SearchType.releaseItems,
     SearchType.mediaItems,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _activeFilter = widget.controller.searchType;
+  }
 
   void _cycleFilter() {
     final currentIdx = _filterCycle.indexOf(_activeFilter);

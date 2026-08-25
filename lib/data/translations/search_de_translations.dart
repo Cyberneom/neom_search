@@ -1,4 +1,4 @@
-import 'package:neom_search/utils/constants/search_translation_constants.dart';
+import '../../utils/constants/search_translation_constants.dart';
 
 class SearchDeTranslations {
 
