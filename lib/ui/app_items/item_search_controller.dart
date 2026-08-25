@@ -113,6 +113,8 @@ class ItemSearchController extends SintController implements ItemSearchService {
         return MediaSearchType.audiobook;
       case ItemlistType.meditation:
         return MediaSearchType.meditation;
+      case ItemlistType.gallery:
+        return MediaSearchType.song;
     }
   }
 
