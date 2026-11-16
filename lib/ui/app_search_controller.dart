@@ -24,8 +24,74 @@ import '../utils/constants/search_constants.dart';
 
 
 class AppSearchController extends SintController implements SearchService {
+  static const int maxSearchQueryChars = 160;
+  static final RegExp _unsafeSearchControls = RegExp(
+    r'[\x00-\x1F\x7F-\x9F\u0085\u061C\u200B\u200C\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2069\uFEFF]',
+  );
+  static final RegExp _gemma4ThoughtClosed = RegExp(
+    r'<\|(?:channel|turn)>\s*thought\b[\s\S]*?<(?:channel|turn)\|>'
+    r'|<\|tool_call>[\s\S]*?<tool_call\|>',
+    caseSensitive: false,
+  );
+  static final RegExp _gemma4ThoughtTruncated = RegExp(
+    r'<\|(?:channel|turn)>\s*thought\b[\s\S]*$'
+    r'|<\|tool_call>[\s\S]*$',
+    caseSensitive: false,
+  );
+  static final RegExp _internalReasoningBlock = RegExp(
+    r'<\s*(think|thought|memory_recall|auto_memory|system_context)\b[^>]*>[\s\S]*?(?:<\s*/\s*\1\s*>|$)'
+    r'|\[\s*(BIOCHIP|MEMORY_RECALL|AUTO_MEMORY|SYSTEM_CONTEXT)\b[^\]]*\][\s\S]*?\[\s*/\s*\2\s*\]',
+    caseSensitive: false,
+  );
+  static final RegExp _sentinelBracketBlock = RegExp(
+    r'\[\s*/?\s*(?:BIOCHIP|MEMORY_RECALL|AUTO_MEMORY|SYSTEM_CONTEXT)\b[^\]]*\]',
+    caseSensitive: false,
+  );
+  static final RegExp _turnTokens = RegExp(
+    r'(?:<\|/?(?:turn|channel|eot|im_start|im_end|tool_call)[^>]*\|?>|<(?:turn|channel|tool_call)\|>)',
+    caseSensitive: false,
+  );
+  static final RegExp _closingContentBoundary = RegExp(
+    r'<\s*/\s*content\s*>',
+    caseSensitive: false,
+  );
 
-  final userServiceImpl = Sint.find<UserService>();
+  static String sanitizeSearchQuery(
+    String raw, {
+    int maxChars = maxSearchQueryChars,
+  }) {
+    if (!maxChars.toDouble().isFinite || maxChars <= 0) return '';
+    var cleaned = raw
+        .replaceAll(_gemma4ThoughtClosed, ' ')
+        .replaceAll(_gemma4ThoughtTruncated, ' ')
+        .replaceAll(_internalReasoningBlock, ' ')
+        .replaceAll(_sentinelBracketBlock, ' ')
+        .replaceAll(_turnTokens, ' ')
+        .replaceAll(_closingContentBoundary, '[content_end]')
+        .replaceAll(_unsafeSearchControls, ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (cleaned.length <= maxChars) return cleaned;
+    var end = maxChars;
+    final cu = cleaned.codeUnitAt(end - 1);
+    if (cu >= 0xD800 && cu <= 0xDBFF) {
+      end -= 1;
+    }
+    if (end <= 0) return '';
+    return cleaned.substring(0, end).trimRight();
+  }
+
+  UserService? _userServiceImpl;
+  UserService? get _userService {
+    if (_userServiceImpl != null) return _userServiceImpl;
+    if (Sint.isRegistered<UserService>()) {
+      _userServiceImpl = Sint.find<UserService>();
+    }
+    return _userServiceImpl;
+  }
+
+  UserService get userServiceImpl => _userService!;
+
   MateService? mateServiceImpl;
   ScrollController scrollController = ScrollController();
 
@@ -47,6 +113,8 @@ class AppSearchController extends SintController implements SearchService {
   RxInt moreResultsQty = 0.obs;
 
   Timer? _debounce;
+  Timer? _initialQueryTimer;
+  bool _isClosed = false;
 
   MateService? get _mateService {
     if (mateServiceImpl != null) return mateServiceImpl;
@@ -64,13 +132,14 @@ class AppSearchController extends SintController implements SearchService {
     AppConfig.logger.d("Search Controller Init");
 
     try {
-      scrollController = ScrollController();
       final args = Sint.arguments;
-      if(args is List && args.isNotEmpty) {
+      if (args is List && args.isNotEmpty) {
         final firstArg = args[0];
-        if(firstArg is SearchType) {
+        if (firstArg is SearchType) {
           searchType = firstArg;
         }
+      } else if (args is SearchType) {
+        searchType = args;
       }
 
       loadSearchInfo();
@@ -96,7 +165,8 @@ class AppSearchController extends SintController implements SearchService {
     };
 
     if (typeParam != null) {
-      final normalized = typeAliases[typeParam.toLowerCase()] ?? typeParam.toLowerCase();
+      final normalized =
+          (typeAliases[typeParam.toLowerCase()] ?? typeParam).toLowerCase();
       final parsed = SearchType.values.where(
         (e) => e.name.toLowerCase() == normalized,
       ).firstOrNull;
@@ -104,26 +174,39 @@ class AppSearchController extends SintController implements SearchService {
     }
 
     final qParam = Sint.queryParam('q') ?? Sint.queryParam('buscar');
-    if (qParam != null && qParam.isNotEmpty) {
-      // Defer to allow loadSearchInfo to complete first
-      Future.delayed(const Duration(milliseconds: 500), () {
-        setSearchParam(qParam);
+    final safeQuery = qParam != null ? sanitizeSearchQuery(qParam) : '';
+    if (safeQuery.isNotEmpty) {
+      // Defer to allow loadSearchInfo to complete first; cancelable on close
+      _initialQueryTimer?.cancel();
+      _initialQueryTimer = Timer(const Duration(milliseconds: 500), () {
+        if (_isClosed) return;
+        setSearchParam(safeQuery);
       });
     }
   }
 
   @override
   void onClose() {
+    _isClosed = true;
     _debounce?.cancel();
+    _initialQueryTimer?.cancel();
     try {
       scrollController.dispose();
     } catch (_) {}
+    _isLoading.close();
+    _filteredProfiles.close();
+    searchParam.close();
+    filteredMediaItems.close();
+    filteredReleaseItems.close();
+    sortedProfileLocation.close();
+    moreResultsType.close();
+    moreResultsQty.close();
     super.onClose();
   }
 
   Future<void> loadSearchInfo() async {
     AppConfig.logger.i("Search Type: $searchType");
-    _isLoading.value = true;
+    if (!_isClosed) _isLoading.value = true;
 
     try {
       // Always load profiles, releases and media items concurrently
@@ -134,22 +217,27 @@ class AppSearchController extends SintController implements SearchService {
         loadReleaseItems(),
       ]);
 
-      setSearchParam("");
+      if (!_isClosed) setSearchParam("");
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadSearchInfo');
     } finally {
-      _isLoading.value = false;
-      update([AppPageIdConstants.search]);
+      if (!_isClosed) {
+        _isLoading.value = false;
+        update([AppPageIdConstants.search]);
+      }
     }
   }
 
   @override
   void setSearchParam(String param, {bool onlyByName = false}) {
+    if (_isClosed) return;
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     AppConfig.logger.t("Search Param: $param, Only By Name: $onlyByName");
 
+    final sanitizedParam = sanitizeSearchQuery(param);
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      searchParam.value = TextUtilities.normalizeString(param);
+      if (_isClosed) return;
+      searchParam.value = TextUtilities.normalizeString(sanitizedParam);
       AppConfig.logger.t("Filtering for: ${searchParam.value}");
 
       // Filter all categories so count badges and tabs are always in sync
@@ -198,27 +286,33 @@ class AppSearchController extends SintController implements SearchService {
   }
 
   void filterMediaItems() {
+    final search = TextUtilities.normalizeString(searchParam.value).toLowerCase();
     filteredMediaItems.value = searchParam.isEmpty
-        ? mediaItems : Map.fromEntries(
-        mediaItems.entries.where((entry) => entry.value.name.toLowerCase().contains(searchParam.value.toLowerCase())
-            || entry.value.ownerName.toLowerCase().contains(searchParam.value.toLowerCase())));
+        ? mediaItems
+        : Map.fromEntries(
+            mediaItems.entries.where((entry) {
+              final name = TextUtilities.normalizeString(entry.value.name).toLowerCase();
+              final owner = TextUtilities.normalizeString(entry.value.ownerName).toLowerCase();
+              return name.contains(search) || owner.contains(search);
+            }),
+          );
   }
 
   void filterReleaseItems() {
+    final search = TextUtilities.normalizeString(searchParam.value).toLowerCase();
     filteredReleaseItems.value = searchParam.isEmpty
-        ? releaseItems : Map.fromEntries(
-        releaseItems.entries.where((entry) {
-          final item = entry.value;
-          final lowerSearch = searchParam.value.toLowerCase();
-          final lowerItemName= entry.value.name.toLowerCase();
+        ? releaseItems
+        : Map.fromEntries(
+            releaseItems.entries.where((entry) {
+              final item = entry.value;
+              final name = TextUtilities.normalizeString(item.name).toLowerCase();
+              final owner = TextUtilities.normalizeString(item.ownerName).toLowerCase();
+              final categoryMatch = item.categories.any((cate) =>
+                  TextUtilities.normalizeString(cate).toLowerCase().contains(search));
 
-          bool nameMatch = lowerItemName.contains(lowerSearch);
-          bool ownerMatch = item.ownerName.toLowerCase().contains(lowerSearch);
-          bool categoryMatch = item.categories.any((cate) => cate.toLowerCase().contains(lowerSearch));
-
-          return nameMatch || ownerMatch || categoryMatch;
-        }
-    ));
+              return name.contains(search) || owner.contains(search) || categoryMatch;
+            }),
+          );
   }
 
   @override
@@ -277,35 +371,56 @@ class AppSearchController extends SintController implements SearchService {
     }
 
     // Cacheamos la posición del usuario para no acceder al getter en cada iteración del loop
-    final userPos = userServiceImpl.profile.position;
+    final userPos = _userService?.profile.position;
+    final hasFiniteUserPos = userPos != null &&
+        userPos.latitude.isFinite &&
+        userPos.longitude.isFinite;
 
-    Map<double, AppProfile> tempMap = {};
+    final Map<double, AppProfile> tempMap = {};
+    final Set<String> placedKeys = <String>{};
+    double maxDistance = 0.0;
 
-    if(userPos != null) {
+    if (hasFiniteUserPos) {
       // Ordenar por distancia al usuario
       _filteredProfiles.value.forEach((key, mate) {
-        if (mate.position != null) {
-          double distance = PositionUtilities.distanceBetweenPositions(userPos, mate.position!);
+        final matePos = mate.position;
+        if (matePos != null &&
+            matePos.latitude.isFinite &&
+            matePos.longitude.isFinite) {
+          double distance = PositionUtilities.distanceBetweenPositions(
+            userPos,
+            matePos,
+          );
+          if (!distance.isFinite || distance < 0) return;
           // Evitar colisiones de claves en el TreeMap
           distance = distance + (Random().nextDouble() * 0.01);
+          while (tempMap.containsKey(distance)) {
+            distance += 0.0001;
+          }
           tempMap[distance] = mate;
+          placedKeys.add(key);
+          if (distance > maxDistance) {
+            maxDistance = distance;
+          }
         }
       });
     }
 
-    // Fallback: perfiles sin posición (o sin geolocación del usuario)
+    // Fallback: perfiles sin posición válida (o sin geolocación del usuario)
     // Los agregamos al final con claves altas para que queden después de los ordenados
-    if(tempMap.length < _filteredProfiles.length) {
-      double fallbackKey = (tempMap.isEmpty ? 0 : tempMap.keys.last) + 1000;
+    if (tempMap.length < _filteredProfiles.length) {
+      double fallbackKey = (tempMap.isEmpty ? 0.0 : maxDistance) + 1000.0;
       // Ordenar alfabéticamente los que no tienen posición o cuando no hay geolocación
-      final remaining = userPos != null
-          ? _filteredProfiles.value.entries.where((e) => e.value.position == null).toList()
-          : _filteredProfiles.value.entries.toList();
-      remaining.sort((a, b) => a.value.name.toLowerCase().compareTo(b.value.name.toLowerCase()));
+      final remaining = _filteredProfiles.value.entries
+          .where((e) => !placedKeys.contains(e.key))
+          .toList();
+      remaining.sort(
+        (a, b) => a.value.name.toLowerCase().compareTo(b.value.name.toLowerCase()),
+      );
       for (final entry in remaining) {
-        if(!tempMap.containsValue(entry.value)) {
+        if (!tempMap.containsValue(entry.value)) {
           tempMap[fallbackKey] = entry.value;
-          fallbackKey += 1;
+          fallbackKey += 1.0;
         }
       }
     }
@@ -315,7 +430,7 @@ class AppSearchController extends SintController implements SearchService {
   }
 
   /// Whether the user has geolocation available (profiles sorted by distance)
-  bool get hasUserPosition => userServiceImpl.profile.position != null;
+  bool get hasUserPosition => _userService?.profile.position != null;
 
   @override
   bool get isLoading => _isLoading.value;
@@ -324,12 +439,14 @@ class AppSearchController extends SintController implements SearchService {
   Map<String, AppProfile> get filteredProfiles => _filteredProfiles.value;
 
   void showMoreResults(SearchType type, {int qty = 10}) {
+    final safeQty = qty.toDouble().isFinite ? qty.clamp(1, 200) : 10;
     if (moreResultsType.value == type) {
-      moreResultsQty.value += qty; // Aumentamos la cantidad a mostrar
+      final next = moreResultsQty.value + safeQty;
+      moreResultsQty.value = next > 10000 ? 10000 : next;
     } else {
       // Si es una categoría nueva, reseteamos la cantidad y cambiamos el tipo
       moreResultsType.value = type;
-      moreResultsQty.value = qty;
+      moreResultsQty.value = safeQty;
     }
   }
 

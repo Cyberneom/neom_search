@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
@@ -8,7 +7,6 @@ import 'package:neom_commons/utils/constants/translations/app_translation_consta
 import 'package:neom_core/utils/enums/search_type.dart';
 import 'package:sint/sint.dart';
 
-import '../utils/constants/search_constants.dart';
 import 'app_search_controller.dart';
 import 'web/search_web_page.dart';
 import 'widgets/appbar_search.dart';
@@ -25,7 +23,9 @@ class AppSearchPage extends StatelessWidget {
       init: Sint.isRegistered<AppSearchController>() ? Sint.find<AppSearchController>() : AppSearchController(),
       autoRemove: false,
       builder: (controller) {
-        if (kIsWeb) return SearchWebPage(controller: controller);
+        if (MediaQuery.sizeOf(context).width > 900) {
+          return SearchWebPage(controller: controller);
+        }
         return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(50),
@@ -35,7 +35,20 @@ class AppSearchPage extends StatelessWidget {
       body: WebContentWrapper(
         maxWidth: 750,
         padding: EdgeInsets.zero,
-        child: Obx(() => Container(
+        child: Obx(() {
+          final totalProfiles = controller.sortedProfileLocation.value.length;
+          final shownProfiles = controller.getChildTypeCount(totalProfiles, SearchType.profiles);
+          final remainingProfiles = totalProfiles - shownProfiles;
+
+          final totalReleases = controller.filteredReleaseItems.length;
+          final shownReleases = controller.getChildTypeCount(totalReleases, SearchType.releaseItems);
+          final remainingReleases = totalReleases - shownReleases;
+
+          final totalMedia = controller.filteredMediaItems.length;
+          final shownMedia = controller.getChildTypeCount(totalMedia, SearchType.mediaItems);
+          final remainingMedia = totalMedia - shownMedia;
+
+          return Container(
         decoration: AppTheme.appBoxDecoration,
         child: controller.isLoading ? const Center(child: CircularProgressIndicator())
             : CustomScrollView(
@@ -53,10 +66,10 @@ class AppSearchPage extends StatelessWidget {
                   final profile = controller.sortedProfileLocation.value.values.elementAt(index);
                   return buildMateTile(profile, context);
                 },
-                childCount: controller.getChildTypeCount(controller.sortedProfileLocation.value.length, SearchType.profiles)
+                childCount: shownProfiles
               ),
             ),
-            if(controller.sortedProfileLocation.value.length > SearchConstants.itemsQty)
+            if(remainingProfiles > 0)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
@@ -66,10 +79,7 @@ class AppSearchPage extends StatelessWidget {
                       shape: const StadiumBorder(),
                     ),
                     onPressed: () => controller.showMoreResults(SearchType.profiles),
-                    child: Text("${AppTranslationConstants.showMore.tr}"
-                        " (${controller.sortedProfileLocation.value.length - SearchConstants.itemsQty
-                        - ((controller.moreResultsType.value == SearchType.profiles) ? controller.moreResultsQty.value : 0)
-                    })",
+                    child: Text("${AppTranslationConstants.showMore.tr} ($remainingProfiles)",
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ),
@@ -84,10 +94,10 @@ class AppSearchPage extends StatelessWidget {
                   final item = controller.filteredReleaseItems.values.elementAt(index);
                   return buildReleaseItemTile(context, item);
                   },
-                  childCount: controller.getChildTypeCount(controller.filteredReleaseItems.length, SearchType.releaseItems)
+                  childCount: shownReleases
               ),
             ),
-            if(controller.filteredReleaseItems.value.length > SearchConstants.itemsQty)
+            if(remainingReleases > 0)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
@@ -97,10 +107,7 @@ class AppSearchPage extends StatelessWidget {
                       shape: const StadiumBorder(),
                     ),
                     onPressed: () => controller.showMoreResults(SearchType.releaseItems),
-                    child: Text("${AppTranslationConstants.showMore.tr}"
-                        " (${controller.filteredReleaseItems.value.length - SearchConstants.itemsQty -
-                        ((controller.moreResultsType.value == SearchType.releaseItems) ? controller.moreResultsQty.value : 0)
-                      })",
+                    child: Text("${AppTranslationConstants.showMore.tr} ($remainingReleases)",
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ),
@@ -116,10 +123,10 @@ class AppSearchPage extends StatelessWidget {
                   final item = controller.filteredMediaItems.values.elementAt(index);
                   return buildMediaItemTile(context, item); // Tu widget existente
                 },
-                childCount: controller.getChildTypeCount(controller.filteredMediaItems.length, SearchType.mediaItems)
+                childCount: shownMedia
               ),
             ),
-            if(controller.filteredMediaItems.value.length > SearchConstants.itemsQty)
+            if(remainingMedia > 0)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
@@ -129,10 +136,7 @@ class AppSearchPage extends StatelessWidget {
                       shape: const StadiumBorder(),
                     ),
                     onPressed: () => controller.showMoreResults(SearchType.mediaItems),
-                    child: Text("${AppTranslationConstants.showMore.tr}"
-                        " (${controller.filteredMediaItems.value.length - SearchConstants.itemsQty -
-                      ((controller.moreResultsType.value == SearchType.mediaItems) ? controller.moreResultsQty.value : 0)
-                    })",
+                    child: Text("${AppTranslationConstants.showMore.tr} ($remainingMedia)",
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ),
@@ -142,11 +146,8 @@ class AppSearchPage extends StatelessWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 50)),
           ],
         )
-        ///DEPRECATED
-        ///   : ListView(
-        /// children: buildCombinedSearchList(controller, context)
-        )
-      ),),);},
+        );
+      }),),);},
     );
   }
 

@@ -1,9 +1,12 @@
 // ignore_for_file: unused_import
 
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
+import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
 import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
@@ -21,14 +24,27 @@ import 'package:neom_core/utils/enums/itemlist_type.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
 import 'package:neom_core/utils/enums/media_search_type.dart';
 import 'package:neom_core/utils/enums/owner_type.dart';
+import 'package:neom_core/utils/enums/release_type.dart';
 import 'package:neom_core/utils/neom_error_logger.dart';
 import 'package:sint/sint.dart';
 
 import '../../domain/use_cases/app_media_item_search_service.dart';
+import '../app_search_controller.dart';
 
 class ItemSearchController extends SintController implements ItemSearchService {
+  static String sanitizeSearchQuery(String raw) =>
+      AppSearchController.sanitizeSearchQuery(raw);
 
-  final userServiceImpl = Sint.find<UserService>();
+  UserService? _userServiceImpl;
+  UserService? get _userService {
+    if (_userServiceImpl != null) return _userServiceImpl;
+    if (Sint.isRegistered<UserService>()) {
+      _userServiceImpl = Sint.find<UserService>();
+    }
+    return _userServiceImpl;
+  }
+
+  UserService get userServiceImpl => _userService!;
 
   TextEditingController searchParamController = TextEditingController();
   TextEditingController nameController = TextEditingController();
@@ -52,39 +68,57 @@ class ItemSearchController extends SintController implements ItemSearchService {
   OwnerType ownerType = OwnerType.profile;
   Itemlist itemlist = Itemlist();
   MediaSearchType searchType = MediaSearchType.song;
+  Timer? _searchDebounce;
+  bool _isClosed = false;
 
   @override
   void onInit() async {
     super.onInit();
     try {
-
-      profile = userServiceImpl.profile;
-      collective = userServiceImpl.collective;
-      ownerType = userServiceImpl.itemlistOwnerType;
+      final us = _userService;
+      if (us != null) {
+        profile = us.profile;
+        collective = us.collective;
+        ownerType = us.itemlistOwnerType;
+      }
       itemlist.ownerType = ownerType;
-      if(ownerType == OwnerType.profile) {
+      if (ownerType == OwnerType.profile) {
         itemlists.value = profile.itemlists ?? {};
       } else {
         itemlists.value = collective.itemlists ?? {};
       }
 
-      if(Sint.arguments != null) {
-        if(Sint.arguments[0] is MediaSearchType) {
-          searchType = Sint.arguments[0] as MediaSearchType;
-          if(Sint.arguments.length == 2) {
-            switch(searchType) {
-              case(MediaSearchType.song):
-              case(MediaSearchType.book):
-                itemlist =  Sint.arguments[1] as Itemlist;
+      final args = Sint.arguments;
+      if (args is List && args.isNotEmpty) {
+        final firstArg = args[0];
+        if (firstArg is MediaSearchType) {
+          searchType = firstArg;
+          if (args.length >= 2) {
+            switch (searchType) {
+              case MediaSearchType.song:
+              case MediaSearchType.book:
+                if (args[1] is Itemlist) {
+                  itemlist = args[1] as Itemlist;
+                }
                 break;
-              case(MediaSearchType.playlist):
-                await initSearchParam(Sint.arguments[1] as String);
+              case MediaSearchType.playlist:
+                if (args[1] is String) {
+                  await initSearchParam(args[1] as String);
+                }
                 break;
               default:
                 break;
             }
           }
+        } else if (firstArg is Itemlist) {
+          itemlist = firstArg;
+          searchType = _getMediaSearchType(itemlist.type);
         }
+      } else if (args is MediaSearchType) {
+        searchType = args;
+      } else if (args is Itemlist) {
+        itemlist = args;
+        searchType = _getMediaSearchType(itemlist.type);
       } else if (itemlist.type != ItemlistType.playlist) {
         searchType = _getMediaSearchType(itemlist.type);
       }
@@ -121,6 +155,7 @@ class ItemSearchController extends SintController implements ItemSearchService {
   @override
   void onReady() async {
     super.onReady();
+    if (_isClosed) return;
     isLoading.value = false;
     update([AppPageIdConstants.mediaItemSearch]);
   }
@@ -132,10 +167,12 @@ class ItemSearchController extends SintController implements ItemSearchService {
   }
 
   Future<void> initSearchParam(String text) async {
+    if (_isClosed) return;
     AppConfig.logger.d("initSearchParam");
+    final cleanText = sanitizeSearchQuery(text);
 
-    searchParam.value = text;
-    searchParamController.text = text;
+    searchParam.value = cleanText;
+    searchParamController.text = cleanText;
 
     try {
       await searchItems();
@@ -143,22 +180,41 @@ class ItemSearchController extends SintController implements ItemSearchService {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'initSearchParam');
     }
 
-    update([AppPageIdConstants.mediaItemSearch]);
+    if (!_isClosed) {
+      update([AppPageIdConstants.mediaItemSearch]);
+    }
   }
 
 
+  void debouncedSetSearchParam(
+    String text, {
+    Duration delay = const Duration(milliseconds: 300),
+  }) {
+    if (_isClosed) return;
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(delay, () {
+      if (_isClosed) return;
+      unawaited(setSearchParam(text));
+    });
+  }
+
   @override
   Future<void> setSearchParam(String text) async {
-    AppConfig.logger.d("Set SearchParam: $text");
+    if (_isClosed) return;
+    _searchDebounce?.cancel();
+    final cleanText = sanitizeSearchQuery(text);
+    AppConfig.logger.d("Set SearchParam: $cleanText");
 
-    searchParam.value = text;
+    searchParam.value = cleanText;
     try {
       await searchItems();
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'setSearchParam');
     }
 
-    update([AppPageIdConstants.mediaItemSearch]);
+    if (!_isClosed) {
+      update([AppPageIdConstants.mediaItemSearch]);
+    }
   }
 
 
@@ -208,19 +264,80 @@ class ItemSearchController extends SintController implements ItemSearchService {
             totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
           }
 
+          final lowerQuery = searchParam.value.toLowerCase();
           for (var value in totalReleaseItems.value.values) {
-            if(value.name.toLowerCase().contains(searchParam.value.toLowerCase())
-                || (value.ownerName.toLowerCase().contains(searchParam.value.toLowerCase()))) {
+            if(value.name.toLowerCase().contains(lowerQuery)
+                || (value.ownerName.toLowerCase().contains(lowerQuery))) {
               foundItems[value.id] = value;
             }
           }
 
-          foundExternalItems.value = await Sint.find<GoogleBookGatewayService>().searchBooksAsExternalItem(searchParam.value);
+          if (Sint.isRegistered<GoogleBookGatewayService>()) {
+            foundExternalItems.value = await Sint.find<GoogleBookGatewayService>().searchBooksAsExternalItem(searchParam.value);
+          }
 
           for (var value in foundExternalItems.value.values) {
-            if(value.name.toLowerCase().contains(searchParam.value)
-                || (value.ownerName.toLowerCase().contains(searchParam.value))) {
+            if(value.name.toLowerCase().contains(lowerQuery)
+                || (value.ownerName.toLowerCase().contains(lowerQuery))) {
               foundItems[value.id] = value;
+            }
+          }
+          break;
+
+        case(MediaSearchType.audiobook):
+          if (totalReleaseItems.isEmpty) {
+            totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
+          }
+          if (totalMediaItems.isEmpty) {
+            totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll());
+          }
+
+          final lowerQueryAudiobook = TextUtilities.normalizeString(searchParam.value).toLowerCase();
+          for (var value in totalReleaseItems.value.values) {
+            if (value.mediaType == MediaItemType.audiobook || value.type == ReleaseType.chapter) {
+              final name = TextUtilities.normalizeString(value.name).toLowerCase();
+              final owner = TextUtilities.normalizeString(value.ownerName).toLowerCase();
+              if (name.contains(lowerQueryAudiobook) || owner.contains(lowerQueryAudiobook)) {
+                foundItems[value.id] = value;
+              }
+            }
+          }
+          for (var value in totalMediaItems.value.values) {
+            if (value.type == MediaItemType.audiobook) {
+              final name = TextUtilities.normalizeString(value.name).toLowerCase();
+              final owner = TextUtilities.normalizeString(value.ownerName).toLowerCase();
+              if (name.contains(lowerQueryAudiobook) || owner.contains(lowerQueryAudiobook)) {
+                foundItems[value.id] = value;
+              }
+            }
+          }
+          break;
+
+        case(MediaSearchType.podcast):
+          if (totalMediaItems.isEmpty) {
+            totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll());
+          }
+          if (totalReleaseItems.isEmpty) {
+            totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
+          }
+
+          final lowerQueryPodcast = TextUtilities.normalizeString(searchParam.value).toLowerCase();
+          for (var value in totalMediaItems.value.values) {
+            if (value.type == MediaItemType.podcast) {
+              final name = TextUtilities.normalizeString(value.name).toLowerCase();
+              final owner = TextUtilities.normalizeString(value.ownerName).toLowerCase();
+              if (name.contains(lowerQueryPodcast) || owner.contains(lowerQueryPodcast)) {
+                foundItems[value.id] = value;
+              }
+            }
+          }
+          for (var value in totalReleaseItems.value.values) {
+            if (value.mediaType == MediaItemType.podcast || value.type == ReleaseType.episode) {
+              final name = TextUtilities.normalizeString(value.name).toLowerCase();
+              final owner = TextUtilities.normalizeString(value.ownerName).toLowerCase();
+              if (name.contains(lowerQueryPodcast) || owner.contains(lowerQueryPodcast)) {
+                foundItems[value.id] = value;
+              }
             }
           }
           break;
@@ -231,13 +348,33 @@ class ItemSearchController extends SintController implements ItemSearchService {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'searchItems');
     }
 
-    update([AppPageIdConstants.mediaItemSearch]);
+    if (!_isClosed) {
+      update([AppPageIdConstants.mediaItemSearch]);
+    }
   }
 
   @override
   void getAppMediaItemDetails(AppMediaItem appMediaItem) {
     AppConfig.logger.d("Sending appMediaItem with title ${appMediaItem.name} to item controller");
     AppUtilities.gotoItemDetails(appMediaItem);
+  }
+
+  @override
+  void onClose() {
+    _isClosed = true;
+    _searchDebounce?.cancel();
+    searchParamController.dispose();
+    nameController.dispose();
+    descController.dispose();
+    isLoading.close();
+    totalMediaItems.close();
+    totalReleaseItems.close();
+    foundExternalItems.close();
+    foundItems.close();
+    itemlists.close();
+    addedItems.close();
+    searchParam.close();
+    super.onClose();
   }
 
 }

@@ -20,7 +20,7 @@ class AppBarItemSearch extends StatelessWidget implements PreferredSizeWidget {
       title: TextField(
         controller: itemSearchController.searchParamController,
         maxLines: 1,
-        onChanged: (param) async => {await itemSearchController.setSearchParam(param.trim())},
+        onChanged: (param) => itemSearchController.debouncedSetSearchParam(param.trim()),
         decoration: InputDecoration(
           suffixIcon: const Icon(Icons.search),
           contentPadding: const EdgeInsets.all(10),

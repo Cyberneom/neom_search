@@ -37,6 +37,18 @@ class SearchWebResults extends StatelessWidget {
         );
       }
 
+      final totalProfiles = controller.sortedProfileLocation.value.length;
+      final shownProfiles = controller.getChildTypeCount(totalProfiles, SearchType.profiles);
+      final remainingProfiles = totalProfiles - shownProfiles;
+
+      final totalReleases = controller.filteredReleaseItems.length;
+      final shownReleases = controller.getChildTypeCount(totalReleases, SearchType.releaseItems);
+      final remainingReleases = totalReleases - shownReleases;
+
+      final totalMedia = controller.filteredMediaItems.length;
+      final shownMedia = controller.getChildTypeCount(totalMedia, SearchType.mediaItems);
+      final remainingMedia = totalMedia - shownMedia;
+
       return CustomScrollView(
         slivers: [
           if (showProfiles) ...[
@@ -51,12 +63,26 @@ class SearchWebResults extends StatelessWidget {
                   final profile = controller.sortedProfileLocation.value.values.elementAt(index);
                   return buildMateTile(profile, context);
                 },
-                childCount: controller.getChildTypeCount(
-                  controller.sortedProfileLocation.value.length,
-                  SearchType.profiles,
-                ),
+                childCount: shownProfiles,
               ),
             ),
+            if (remainingProfiles > 0)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () => controller.showMoreResults(SearchType.profiles),
+                    child: Text(
+                      "${AppTranslationConstants.showMore.tr} ($remainingProfiles)",
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
           ],
           if (showReleases) ...[
             _buildSectionHeader(AppTranslationConstants.releases.tr),
@@ -66,12 +92,26 @@ class SearchWebResults extends StatelessWidget {
                   final item = controller.filteredReleaseItems.values.elementAt(index);
                   return buildReleaseItemTile(context, item);
                 },
-                childCount: controller.getChildTypeCount(
-                  controller.filteredReleaseItems.length,
-                  SearchType.releaseItems,
-                ),
+                childCount: shownReleases,
               ),
             ),
+            if (remainingReleases > 0)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () => controller.showMoreResults(SearchType.releaseItems),
+                    child: Text(
+                      "${AppTranslationConstants.showMore.tr} ($remainingReleases)",
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
           ],
           if (showMedia) ...[
             _buildSectionHeader(AppTranslationConstants.audioLibrary.tr),
@@ -81,12 +121,26 @@ class SearchWebResults extends StatelessWidget {
                   final item = controller.filteredMediaItems.values.elementAt(index);
                   return buildMediaItemTile(context, item);
                 },
-                childCount: controller.getChildTypeCount(
-                  controller.filteredMediaItems.length,
-                  SearchType.mediaItems,
-                ),
+                childCount: shownMedia,
               ),
             ),
+            if (remainingMedia > 0)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () => controller.showMoreResults(SearchType.mediaItems),
+                    child: Text(
+                      "${AppTranslationConstants.showMore.tr} ($remainingMedia)",
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
           ],
           const SliverToBoxAdapter(child: SizedBox(height: 50)),
         ],
