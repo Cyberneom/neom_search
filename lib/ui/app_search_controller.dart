@@ -5,10 +5,12 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
+import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/data/api/app_platform_api.dart';
+import 'package:neom_core/data/api/app_release_items.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
-import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
@@ -343,7 +345,17 @@ class AppSearchController extends SintController implements SearchService {
   Future<void> loadMediaItems() async {
     AppConfig.logger.d("Loading Media Items");
     try {
-      mediaItems = await AppMediaItemFirestore().fetchAll();
+      if (AppPlatformApi.isEnabled) {
+        if (releaseItems.isEmpty) {
+          releaseItems = await AppReleaseItems.repository.retrieveAll();
+        }
+        mediaItems = {
+          for (final entry in releaseItems.entries)
+            entry.key: AppMediaItemMapper.fromAppReleaseItem(entry.value),
+        };
+      } else {
+        mediaItems = await AppMediaItemFirestore().fetchAll();
+      }
       filterMediaItems();
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadMediaItems');
@@ -354,7 +366,7 @@ class AppSearchController extends SintController implements SearchService {
   Future<void> loadReleaseItems() async {
     AppConfig.logger.d("Loading Release Items");
     try {
-      releaseItems = await AppReleaseItemFirestore().retrieveAll();
+      releaseItems = await AppReleaseItems.repository.retrieveAll();
       filterReleaseItems();
     } catch (e, st) {
       NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadReleaseItems');

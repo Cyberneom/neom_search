@@ -8,14 +8,16 @@ import 'package:neom_commons/utils/constants/app_page_id_constants.dart';
 import 'package:neom_commons/utils/mappers/app_media_item_mapper.dart';
 import 'package:neom_commons/utils/text_utilities.dart';
 import 'package:neom_core/app_config.dart';
+import 'package:neom_core/data/api/app_platform_api.dart';
+import 'package:neom_core/data/api/app_release_items.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
-import 'package:neom_core/data/firestore/app_release_item_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
 import 'package:neom_core/domain/model/collective.dart';
 import 'package:neom_core/domain/model/external_item.dart';
 import 'package:neom_core/domain/model/item_list.dart';
+import 'package:neom_core/domain/use_cases/external_music_service.dart';
 import 'package:neom_core/domain/use_cases/google_book_gateway_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
@@ -225,33 +227,49 @@ class ItemSearchController extends SintController implements ItemSearchService {
     try {
       switch(searchType) {
         case(MediaSearchType.song):
+          final needle = searchParam.value.trim().toLowerCase();
+          if (needle.isEmpty) break;
 
-          if(totalMediaItems.isEmpty) {
+          if (!AppPlatformApi.isEnabled && totalMediaItems.isEmpty) {
             totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll(excludeTypes: [MediaItemType.pdf, MediaItemType.neomPreset]));
           }
 
-          if(AppConfig.instance.appInUse != AppInUse.e) {
-            if(totalReleaseItems.isEmpty) totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
+          if (AppConfig.instance.appInUse != AppInUse.e) {
+            if (totalReleaseItems.isEmpty) {
+              totalReleaseItems.value = await AppReleaseItems.repository.retrieveAll();
+            }
+            for (final release in totalReleaseItems.value.values) {
+              if (release.name.toLowerCase().contains(needle) ||
+                  release.ownerName.toLowerCase().contains(needle)) {
+                foundItems[release.id] = release;
+              }
+            }
           }
 
           for (var value in totalMediaItems.value.values) {
-            if(value.name.toLowerCase().contains(searchParam.value.toLowerCase())
-                || (value.ownerName.toLowerCase().contains(searchParam.value.toLowerCase()))) {
+            if(value.name.toLowerCase().contains(needle)
+                || (value.ownerName.toLowerCase().contains(needle))) {
               foundItems[value.id] = value;
             }
           }
 
           switch(AppConfig.instance.appInUse) {
             case AppInUse.g:
-              ///VERIFY IF IS A GOOD STRATEGY TO USE SEARCH ON SPOTIFY OR IF ITS JUST NOISE
-              // Map<String, AppMediaItem> spotifySongs = await SpotifySearch.searchSongs(searchParam.value);
-              // appMediaItems.addAll(spotifySongs);
+              if (needle.length >= 2 && Sint.isRegistered<ExternalMusicService>()) {
+                final ytSongs = await Sint.find<ExternalMusicService>().searchSongs(searchParam.value.trim());
+                for (final song in ytSongs) {
+                  if (song.id.isNotEmpty) {
+                    foundExternalItems[song.id] = song;
+                    foundItems.putIfAbsent(song.id, () => song);
+                  }
+                }
+              }
               break;
             default:
               break;
           }
 
-          AppConfig.logger.d("${foundItems.length} appMediaItems retrieved");
+          AppConfig.logger.d("${foundItems.length} songs retrieved (catalog + YouTube)");
           break;
         case(MediaSearchType.playlist):
           ///NOT IN USE
@@ -261,7 +279,7 @@ class ItemSearchController extends SintController implements ItemSearchService {
 
         case(MediaSearchType.book):
           if(totalReleaseItems.isEmpty) {
-            totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
+            totalReleaseItems.value = await AppReleaseItems.repository.retrieveAll();
           }
 
           final lowerQuery = searchParam.value.toLowerCase();
