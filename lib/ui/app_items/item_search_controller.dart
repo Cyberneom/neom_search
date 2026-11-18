@@ -304,7 +304,7 @@ class ItemSearchController extends SintController implements ItemSearchService {
 
         case(MediaSearchType.audiobook):
           if (totalReleaseItems.isEmpty) {
-            totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
+            totalReleaseItems.value = await AppReleaseItems.repository.retrieveAll();
           }
           if (totalMediaItems.isEmpty) {
             totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll());
@@ -336,7 +336,7 @@ class ItemSearchController extends SintController implements ItemSearchService {
             totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll());
           }
           if (totalReleaseItems.isEmpty) {
-            totalReleaseItems.value = await AppReleaseItemFirestore().retrieveAll();
+            totalReleaseItems.value = await AppReleaseItems.repository.retrieveAll();
           }
 
           final lowerQueryPodcast = TextUtilities.normalizeString(searchParam.value).toLowerCase();
