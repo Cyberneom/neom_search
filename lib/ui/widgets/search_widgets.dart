@@ -3,6 +3,7 @@ import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/custom_image.dart';
+import 'package:neom_commons/ui/widgets/giglist/giglist_preview_sheet.dart';
 import 'package:neom_commons/ui/widgets/images/neom_image_card.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/auth_guard.dart';
@@ -197,14 +198,31 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
         ? Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (externalItem.permaUrl.isNotEmpty)
-                IconButton(
-                  tooltip: 'Ver referencia en YouTube Music',
-                  icon: const Icon(Icons.open_in_new_rounded, size: 18, color: Colors.white70),
-                  onPressed: () => ExternalUtilities.launchURL(externalItem.permaUrl, sameTab: false),
-                ),
               IconButton(
-                tooltip: 'Agregar a Mi Repertorio',
+                tooltip: 'Preview 30s (YouTube Music)',
+                icon: const Icon(Icons.ondemand_video_rounded, size: 20, color: Colors.redAccent),
+                onPressed: () {
+                  Itemlist? preselected;
+                  if (Sint.isRegistered<ItemSearchController>()) {
+                    final ctrl = Sint.find<ItemSearchController>();
+                    if (ctrl.itemlist.id.isNotEmpty &&
+                        ctrl.itemlist.type == ItemlistType.giglist) {
+                      preselected = ctrl.itemlist;
+                    }
+                  }
+                  GiglistPreviewSheet.show(
+                    context,
+                    item: externalItem,
+                    onAddToGiglist: () => showAddSongToRepertoireDialog(
+                      context,
+                      externalItem: externalItem,
+                      preselectedList: preselected,
+                    ),
+                  );
+                },
+              ),
+              IconButton(
+                tooltip: 'Agregar a Giglist (Repertorio)',
                 icon: Icon(Icons.playlist_add_circle_outlined, color: AppColor.getMain()),
                 onPressed: () => showAddSongToRepertoireDialog(
                   context,
@@ -222,7 +240,10 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
         Itemlist? preselected;
         if (Sint.isRegistered<ItemSearchController>()) {
           final ctrl = Sint.find<ItemSearchController>();
-          if (ctrl.itemlist.id.isNotEmpty) preselected = ctrl.itemlist;
+          if (ctrl.itemlist.id.isNotEmpty &&
+              ctrl.itemlist.type == ItemlistType.giglist) {
+            preselected = ctrl.itemlist;
+          }
         }
         showAddSongToRepertoireDialog(
           context,
@@ -265,16 +286,25 @@ Future<bool> showAddSongToRepertoireDialog(
     profile.itemlists = Map<String, Itemlist>.from(userLists);
   }
 
-  final modifiableLists = userLists.values.where((l) => l.isModifiable).toList();
+  final bool isExternalYoutube = externalItem != null;
+  // External YouTube Music songs MUST belong strictly to Giglists
+  // (`ItemlistType.giglist`), never to Gigmeout streaming Playlists.
+  final modifiableLists = userLists.values.where((l) {
+    if (!l.isModifiable) return false;
+    if (isExternalYoutube) return l.type == ItemlistType.giglist;
+    return l.type == ItemlistType.giglist || l.type == ItemlistType.playlist;
+  }).toList();
+
   if (modifiableLists.isEmpty) {
     final now = DateTime.now().millisecondsSinceEpoch;
     final defaultList = Itemlist(
-      name: 'Mi Repertorio',
-      description: 'Canciones que toco, canto o domino para hacer match con Songmates',
+      name: 'Mi Giglist',
+      description: 'Canciones de mi repertorio (YouTube Music) para conectar con Songmates',
       ownerId: profile.id,
       ownerName: profile.name,
-      type: AppFlavour.getDefaultItemlistType(),
+      type: ItemlistType.giglist,
       public: true,
+      externalItems: [],
       createdTime: now,
       modifiedTime: now,
     );
@@ -393,7 +423,16 @@ Future<bool> showAddSongToRepertoireDialog(
                           ],
                         ),
                       ),
-                      if (ytUrl.isNotEmpty)
+                      if (externalItem != null)
+                        TextButton.icon(
+                          onPressed: () => GiglistPreviewSheet.show(
+                            ctx,
+                            item: externalItem,
+                          ),
+                          icon: const Icon(Icons.ondemand_video_rounded, size: 16, color: Colors.redAccent),
+                          label: const Text('Preview 30s', style: TextStyle(color: Colors.redAccent)),
+                        )
+                      else if (ytUrl.isNotEmpty)
                         TextButton.icon(
                           onPressed: () => ExternalUtilities.launchURL(ytUrl, sameTab: false),
                           icon: const Icon(Icons.open_in_new, size: 16, color: Colors.redAccent),

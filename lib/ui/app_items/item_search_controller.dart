@@ -190,11 +190,16 @@ class ItemSearchController extends SintController implements ItemSearchService {
 
   void debouncedSetSearchParam(
     String text, {
-    Duration delay = const Duration(milliseconds: 300),
+    Duration? delay,
   }) {
     if (_isClosed) return;
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(delay, () {
+    final effectiveDelay = delay ??
+        (AppConfig.instance.appInUse == AppInUse.g &&
+                searchType == MediaSearchType.song
+            ? const Duration(milliseconds: 600)
+            : const Duration(milliseconds: 300));
+    _searchDebounce = Timer(effectiveDelay, () {
       if (_isClosed) return;
       unawaited(setSearchParam(text));
     });
@@ -230,32 +235,44 @@ class ItemSearchController extends SintController implements ItemSearchService {
           final needle = searchParam.value.trim().toLowerCase();
           if (needle.isEmpty) break;
 
-          if (!AppPlatformApi.isEnabled && totalMediaItems.isEmpty) {
-            totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll(excludeTypes: [MediaItemType.pdf, MediaItemType.neomPreset]));
-          }
+          final bool isTargetStreamingPlaylist =
+              itemlist.id.isNotEmpty && itemlist.type == ItemlistType.playlist;
+          final bool isTargetGiglist =
+              itemlist.id.isNotEmpty && itemlist.type == ItemlistType.giglist;
 
-          if (AppConfig.instance.appInUse != AppInUse.e) {
-            if (totalReleaseItems.isEmpty) {
-              totalReleaseItems.value = await AppReleaseItems.repository.retrieveAll();
+          // Giglists pull primarily from YouTube Music for musician repertoire
+          // matching (preview-only); streaming Playlists only include Gigmeout
+          // streamable catalog tracks so non-playable YouTube items never mix in.
+          if (!isTargetGiglist) {
+            if (!AppPlatformApi.isEnabled && totalMediaItems.isEmpty) {
+              totalMediaItems.value.addAll(await AppMediaItemFirestore().fetchAll(excludeTypes: [MediaItemType.pdf, MediaItemType.neomPreset]));
             }
-            for (final release in totalReleaseItems.value.values) {
-              if (release.name.toLowerCase().contains(needle) ||
-                  release.ownerName.toLowerCase().contains(needle)) {
-                foundItems[release.id] = release;
+
+            if (AppConfig.instance.appInUse != AppInUse.e) {
+              if (totalReleaseItems.isEmpty) {
+                totalReleaseItems.value = await AppReleaseItems.repository.retrieveAll();
+              }
+              for (final release in totalReleaseItems.value.values) {
+                if (release.name.toLowerCase().contains(needle) ||
+                    release.ownerName.toLowerCase().contains(needle)) {
+                  foundItems[release.id] = release;
+                }
               }
             }
-          }
 
-          for (var value in totalMediaItems.value.values) {
-            if(value.name.toLowerCase().contains(needle)
-                || (value.ownerName.toLowerCase().contains(needle))) {
-              foundItems[value.id] = value;
+            for (var value in totalMediaItems.value.values) {
+              if(value.name.toLowerCase().contains(needle)
+                  || (value.ownerName.toLowerCase().contains(needle))) {
+                foundItems[value.id] = value;
+              }
             }
           }
 
           switch(AppConfig.instance.appInUse) {
             case AppInUse.g:
-              if (needle.length >= 2 && Sint.isRegistered<ExternalMusicService>()) {
+              if (!isTargetStreamingPlaylist &&
+                  needle.length >= 2 &&
+                  Sint.isRegistered<ExternalMusicService>()) {
                 final ytSongs = await Sint.find<ExternalMusicService>().searchSongs(searchParam.value.trim());
                 for (final song in ytSongs) {
                   if (song.id.isNotEmpty) {
