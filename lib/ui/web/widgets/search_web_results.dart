@@ -23,12 +23,14 @@ class SearchWebResults extends StatelessWidget {
     return Obx(() {
       final showProfiles = (activeFilter == SearchType.any || activeFilter == SearchType.profiles)
           && controller.sortedProfileLocation.value.isNotEmpty;
+      final showCollectives = (activeFilter == SearchType.any || activeFilter == SearchType.collectives)
+          && controller.filteredCollectives.isNotEmpty;
       final showReleases = (activeFilter == SearchType.any || activeFilter == SearchType.releaseItems)
           && controller.filteredReleaseItems.isNotEmpty;
       final showMedia = (activeFilter == SearchType.any || activeFilter == SearchType.mediaItems)
           && controller.filteredMediaItems.isNotEmpty;
 
-      if (!showProfiles && !showReleases && !showMedia) {
+      if (!showProfiles && !showCollectives && !showReleases && !showMedia) {
         return Center(
           child: Text(
             AppTranslationConstants.noResults.tr,
@@ -40,6 +42,10 @@ class SearchWebResults extends StatelessWidget {
       final totalProfiles = controller.sortedProfileLocation.value.length;
       final shownProfiles = controller.getChildTypeCount(totalProfiles, SearchType.profiles);
       final remainingProfiles = totalProfiles - shownProfiles;
+
+      final totalCollectives = controller.filteredCollectives.length;
+      final shownCollectives = controller.getChildTypeCount(totalCollectives, SearchType.collectives);
+      final remainingCollectives = totalCollectives - shownCollectives;
 
       final totalReleases = controller.filteredReleaseItems.length;
       final shownReleases = controller.getChildTypeCount(totalReleases, SearchType.releaseItems);
@@ -78,6 +84,35 @@ class SearchWebResults extends StatelessWidget {
                     onPressed: () => controller.showMoreResults(SearchType.profiles),
                     child: Text(
                       "${AppTranslationConstants.showMore.tr} ($remainingProfiles)",
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          if (showCollectives) ...[
+            _buildSectionHeader(AppTranslationConstants.collectives.tr),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final collective = controller.filteredCollectives.values.elementAt(index);
+                  return buildCollectiveTile(context, collective);
+                },
+                childCount: shownCollectives,
+              ),
+            ),
+            if (remainingCollectives > 0)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.grey),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () => controller.showMoreResults(SearchType.collectives),
+                    child: Text(
+                      "${AppTranslationConstants.showMore.tr} ($remainingCollectives)",
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ),

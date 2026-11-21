@@ -4,6 +4,7 @@ import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/theme/app_theme.dart';
 import 'package:neom_commons/ui/widgets/custom_image.dart';
 import 'package:neom_commons/ui/widgets/giglist/giglist_preview_sheet.dart';
+import 'package:neom_commons/ui/widgets/images/handled_cached_network_image.dart';
 import 'package:neom_commons/ui/widgets/images/neom_image_card.dart';
 import 'package:neom_commons/utils/app_utilities.dart';
 import 'package:neom_commons/utils/auth_guard.dart';
@@ -17,8 +18,10 @@ import 'package:neom_core/data/firestore/itemlist_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
+import 'package:neom_core/domain/model/collective.dart';
 import 'package:neom_core/domain/model/external_item.dart';
 import 'package:neom_core/domain/model/item_list.dart';
+import 'package:neom_core/domain/repository/itemlist_repository.dart';
 import 'package:neom_core/domain/use_cases/app_hive_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
 import 'package:neom_core/utils/constants/app_route_constants.dart';
@@ -27,11 +30,96 @@ import 'package:neom_core/utils/enums/app_item_state.dart';
 import 'package:neom_core/utils/enums/external_media_source.dart';
 import 'package:neom_core/utils/enums/itemlist_type.dart';
 import 'package:neom_core/utils/enums/media_item_type.dart';
+import 'package:neom_core/utils/enums/owner_type.dart';
 import 'package:neom_core/utils/enums/profile_type.dart';
 import 'package:neom_core/utils/enums/verification_level.dart';
 import 'package:sint/sint.dart';
 
 import '../app_items/item_search_controller.dart';
+
+/// Builds a collective / band card tile for search results.
+/// Navigates to collective details when tapped.
+Widget buildCollectiveTile(BuildContext context, Collective collective) {
+  if (collective.name.trim().isEmpty || !collective.isActive) {
+    return const SizedBox.shrink();
+  }
+
+  final filledMembers = collective.members?.values
+          .where((m) => m.profileId.trim().isNotEmpty)
+          .length ??
+      0;
+  final memberCount = filledMembers > 0
+      ? filledMembers
+      : (collective.memberProfileIds.isNotEmpty
+          ? collective.memberProfileIds.length
+          : (collective.members?.length ?? 0));
+  final description = collective.description.trim();
+
+  return ListTile(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 4.0),
+    leading: ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: collective.photoUrl.trim().isNotEmpty
+            ? HandledCachedNetworkImage(
+                collective.photoUrl,
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+                enableFullScreen: false,
+              )
+            : platformNetworkImage(
+                imageUrl: AppProperties.getAppLogoUrl(),
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+              ),
+      ),
+    ),
+    title: Row(
+      children: [
+        Flexible(
+          child: Text(
+            collective.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (memberCount > 0) ...[
+          const SizedBox(width: 8),
+          Icon(Icons.people_outline, size: 14, color: AppColor.textSecondary),
+          const SizedBox(width: 3),
+          Text(
+            '$memberCount',
+            style: TextStyle(color: AppColor.textSecondary, fontSize: 12),
+          ),
+        ],
+      ],
+    ),
+    subtitle: description.isNotEmpty
+        ? Text(
+            description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: AppColor.textSecondary, fontSize: 12),
+          )
+        : null,
+    trailing: Icon(Icons.groups_outlined, size: 18, color: AppColor.textSecondary),
+    onTap: () {
+      if (collective.id.isEmpty) return;
+      if (Sint.isRegistered<AppHiveService>()) {
+        Sint.find<AppHiveService>().addQuery(collective.name);
+      }
+      Sint.toNamed(
+        AppRouteConstants.collectivePath(collective.id, slug: collective.slug),
+        arguments: [collective],
+      );
+    },
+  );
+}
 
 /// Builds a single profile tile for search results.
 /// Navigates to mateDetails route when tapped.
@@ -134,10 +222,20 @@ ListTile buildReleaseItemTile(BuildContext context, AppReleaseItem releaseItem) 
         ? IconButton(
             tooltip: 'Agregar a Mi Repertorio',
             icon: Icon(Icons.playlist_add_circle_outlined, color: AppColor.getMain()),
-            onPressed: () => showAddSongToRepertoireDialog(
-              context,
-              releaseItem: releaseItem,
-            ),
+            onPressed: () {
+              Itemlist? preselected;
+              if (Sint.isRegistered<ItemSearchController>()) {
+                final ctrl = Sint.find<ItemSearchController>();
+                if (ctrl.itemlist.id.isNotEmpty) {
+                  preselected = ctrl.itemlist;
+                }
+              }
+              showAddSongToRepertoireDialog(
+                context,
+                releaseItem: releaseItem,
+                preselectedList: preselected,
+              );
+            },
           )
         : null,
     onTap: () {
@@ -224,10 +322,21 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
               IconButton(
                 tooltip: 'Agregar a Giglist (Repertorio)',
                 icon: Icon(Icons.playlist_add_circle_outlined, color: AppColor.getMain()),
-                onPressed: () => showAddSongToRepertoireDialog(
-                  context,
-                  externalItem: externalItem,
-                ),
+                onPressed: () {
+                  Itemlist? preselected;
+                  if (Sint.isRegistered<ItemSearchController>()) {
+                    final ctrl = Sint.find<ItemSearchController>();
+                    if (ctrl.itemlist.id.isNotEmpty &&
+                        ctrl.itemlist.type == ItemlistType.giglist) {
+                      preselected = ctrl.itemlist;
+                    }
+                  }
+                  showAddSongToRepertoireDialog(
+                    context,
+                    externalItem: externalItem,
+                    preselectedList: preselected,
+                  );
+                },
               ),
             ],
           )
@@ -257,11 +366,59 @@ ListTile buildExternalItemTile(BuildContext context, ExternalItem externalItem) 
   );
 }
 
+class RepertoireTargetOwner {
+  final OwnerType ownerType;
+  final String ownerId;
+  final String ownerName;
+
+  const RepertoireTargetOwner({
+    required this.ownerType,
+    required this.ownerId,
+    required this.ownerName,
+  });
+
+  bool get isCollective => ownerType == OwnerType.collective;
+}
+
+RepertoireTargetOwner resolveRepertoireTargetOwner({
+  required UserService userService,
+  Itemlist? preselectedList,
+}) {
+  final bool isCollectiveTarget =
+      (preselectedList != null &&
+          preselectedList.ownerType == OwnerType.collective) ||
+      (userService.itemlistOwnerType == OwnerType.collective &&
+          userService.collective.id.isNotEmpty);
+
+  if (isCollectiveTarget) {
+    final ownerId = (preselectedList?.ownerId.isNotEmpty ?? false)
+        ? preselectedList!.ownerId
+        : userService.collective.id;
+    final ownerName = (preselectedList?.ownerName.isNotEmpty ?? false)
+        ? preselectedList!.ownerName
+        : userService.collective.name;
+    if (ownerId.isNotEmpty) {
+      return RepertoireTargetOwner(
+        ownerType: OwnerType.collective,
+        ownerId: ownerId,
+        ownerName: ownerName,
+      );
+    }
+  }
+
+  return RepertoireTargetOwner(
+    ownerType: OwnerType.profile,
+    ownerId: userService.profile.id,
+    ownerName: userService.profile.name,
+  );
+}
+
 Future<bool> showAddSongToRepertoireDialog(
   BuildContext context, {
   ExternalItem? externalItem,
   AppReleaseItem? releaseItem,
   Itemlist? preselectedList,
+  ItemlistRepository? itemlistRepository,
 }) async {
   if (!AppConfig.instance.canPersistUserActivity) {
     AuthGuard.protect(
@@ -271,6 +428,7 @@ Future<bool> showAddSongToRepertoireDialog(
         externalItem: externalItem,
         releaseItem: releaseItem,
         preselectedList: preselectedList,
+        itemlistRepository: itemlistRepository,
       ),
     );
     return false;
@@ -278,18 +436,53 @@ Future<bool> showAddSongToRepertoireDialog(
 
   final userService = Sint.find<UserService>();
   final profile = userService.profile;
-  final itemlistRepo = ItemlistFirestore();
+  final itemlistRepo = itemlistRepository ?? ItemlistFirestore();
+  final targetOwner = resolveRepertoireTargetOwner(
+    userService: userService,
+    preselectedList: preselectedList,
+  );
 
-  Map<String, Itemlist> userLists = Map<String, Itemlist>.from(profile.itemlists ?? {});
-  if (userLists.isEmpty && profile.id.isNotEmpty) {
-    userLists = await itemlistRepo.getByOwnerId(profile.id);
-    profile.itemlists = Map<String, Itemlist>.from(userLists);
+  Map<String, Itemlist> targetLists;
+  if (targetOwner.isCollective) {
+    targetLists = userService.collective.id == targetOwner.ownerId
+        ? Map<String, Itemlist>.from(userService.collective.itemlists ?? {})
+        : <String, Itemlist>{};
+    if (targetOwner.ownerId.isNotEmpty &&
+        (targetLists.isEmpty ||
+            (preselectedList != null &&
+                preselectedList.id.isNotEmpty &&
+                !targetLists.containsKey(preselectedList.id)))) {
+      final fetched = await itemlistRepo.fetchAll(
+        ownerId: targetOwner.ownerId,
+        ownerType: OwnerType.collective,
+      );
+      if (fetched.isNotEmpty) {
+        targetLists = Map<String, Itemlist>.from(fetched);
+      }
+    }
+    if (preselectedList != null &&
+        preselectedList.id.isNotEmpty &&
+        preselectedList.ownerType == OwnerType.collective) {
+      targetLists.putIfAbsent(preselectedList.id, () => preselectedList);
+    }
+    if (userService.collective.id == targetOwner.ownerId) {
+      userService.collective.itemlists = Map<String, Itemlist>.from(targetLists);
+    }
+  } else {
+    targetLists = Map<String, Itemlist>.from(profile.itemlists ?? {});
+    if (targetLists.isEmpty && targetOwner.ownerId.isNotEmpty) {
+      targetLists = await itemlistRepo.fetchAll(
+        ownerId: targetOwner.ownerId,
+        ownerType: OwnerType.profile,
+      );
+      profile.itemlists = Map<String, Itemlist>.from(targetLists);
+    }
   }
 
   final bool isExternalYoutube = externalItem != null;
   // External YouTube Music songs MUST belong strictly to Giglists
   // (`ItemlistType.giglist`), never to Gigmeout streaming Playlists.
-  final modifiableLists = userLists.values.where((l) {
+  final modifiableLists = targetLists.values.where((l) {
     if (!l.isModifiable) return false;
     if (isExternalYoutube) return l.type == ItemlistType.giglist;
     return l.type == ItemlistType.giglist || l.type == ItemlistType.playlist;
@@ -298,10 +491,15 @@ Future<bool> showAddSongToRepertoireDialog(
   if (modifiableLists.isEmpty) {
     final now = DateTime.now().millisecondsSinceEpoch;
     final defaultList = Itemlist(
-      name: 'Mi Giglist',
-      description: 'Canciones de mi repertorio (YouTube Music) para conectar con Songmates',
-      ownerId: profile.id,
-      ownerName: profile.name,
+      name: targetOwner.isCollective && targetOwner.ownerName.isNotEmpty
+          ? 'Giglist · ${targetOwner.ownerName}'
+          : 'Mi Giglist',
+      description: targetOwner.isCollective
+          ? 'Repertorio de ${targetOwner.ownerName} (YouTube Music)'
+          : 'Canciones de mi repertorio (YouTube Music) para conectar con Songmates',
+      ownerId: targetOwner.ownerId,
+      ownerName: targetOwner.ownerName,
+      ownerType: targetOwner.ownerType,
       type: ItemlistType.giglist,
       public: true,
       externalItems: [],
@@ -312,8 +510,15 @@ Future<bool> showAddSongToRepertoireDialog(
     if (newId.isNotEmpty) {
       defaultList.id = newId;
       modifiableLists.add(defaultList);
-      profile.itemlists ??= {};
-      profile.itemlists![newId] = defaultList;
+      if (targetOwner.isCollective) {
+        if (userService.collective.id == targetOwner.ownerId) {
+          userService.collective.itemlists ??= {};
+          userService.collective.itemlists![newId] = defaultList;
+        }
+      } else {
+        profile.itemlists ??= {};
+        profile.itemlists![newId] = defaultList;
+      }
     }
   }
 
@@ -447,6 +652,7 @@ Future<bool> showAddSongToRepertoireDialog(
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     initialValue: masteryState,
                     dropdownColor: AppColor.surfaceCard,
                     style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -459,7 +665,7 @@ Future<bool> showAddSongToRepertoireDialog(
                     items: labels.entries
                         .map((e) => DropdownMenuItem<int>(
                               value: e.key,
-                              child: Text(e.value),
+                              child: Text(e.value, overflow: TextOverflow.ellipsis),
                             ))
                         .toList(),
                     onChanged: (v) => setSheetState(() => masteryState = v ?? 5),
@@ -472,6 +678,7 @@ Future<bool> showAddSongToRepertoireDialog(
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: selectedListId,
                       dropdownColor: AppColor.surfaceCard,
                       style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -484,7 +691,7 @@ Future<bool> showAddSongToRepertoireDialog(
                       items: modifiableLists
                           .map((l) => DropdownMenuItem<String>(
                                 value: l.id,
-                                child: Text('${l.name} (${l.allItems.length})'),
+                                child: Text('${l.name} (${l.allItems.length})', overflow: TextOverflow.ellipsis),
                               ))
                           .toList(),
                       onChanged: (v) => setSheetState(() => selectedListId = v ?? selectedListId),
@@ -505,16 +712,37 @@ Future<bool> showAddSongToRepertoireDialog(
                               setSheetState(() => saving = true);
                               bool ok = false;
                               String savedItemId = '';
+                              final selectedList = modifiableLists.firstWhere(
+                                (l) => l.id == selectedListId,
+                                orElse: () => modifiableLists.first,
+                              );
+                              final bool isCollectiveSave =
+                                  targetOwner.isCollective ||
+                                  selectedList.ownerType == OwnerType.collective;
+
                               if (externalItem != null) {
                                 externalItem.state = masteryState;
                                 ok = await itemlistRepo.addExternalItem(selectedListId, externalItem);
                                 savedItemId = externalItem.id;
                                 if (ok) {
-                                  final target = profile.itemlists?[selectedListId];
-                                  if (target != null) {
-                                    target.externalItems ??= [];
-                                    target.externalItems!.removeWhere((x) => x.id == externalItem.id);
-                                    target.externalItems!.add(externalItem);
+                                  selectedList.externalItems ??= [];
+                                  selectedList.externalItems!.removeWhere((x) => x.id == externalItem.id);
+                                  selectedList.externalItems!.add(externalItem);
+                                  if (isCollectiveSave) {
+                                    if (userService.collective.id == targetOwner.ownerId) {
+                                      userService.collective.itemlists ??= {};
+                                      userService.collective.itemlists![selectedListId] = selectedList;
+                                    }
+                                  } else {
+                                    final target = profile.itemlists?[selectedListId];
+                                    if (target != null && !identical(target, selectedList)) {
+                                      target.externalItems ??= [];
+                                      target.externalItems!.removeWhere((x) => x.id == externalItem.id);
+                                      target.externalItems!.add(externalItem);
+                                    } else {
+                                      profile.itemlists ??= {};
+                                      profile.itemlists![selectedListId] = selectedList;
+                                    }
                                   }
                                 }
                               } else if (releaseItem != null) {
@@ -522,15 +750,28 @@ Future<bool> showAddSongToRepertoireDialog(
                                 ok = await itemlistRepo.addReleaseItem(selectedListId, releaseItem);
                                 savedItemId = releaseItem.id;
                                 if (ok) {
-                                  final target = profile.itemlists?[selectedListId];
-                                  if (target != null) {
-                                    target.appReleaseItems ??= [];
-                                    target.appReleaseItems!.removeWhere((x) => x.id == releaseItem.id);
-                                    target.appReleaseItems!.add(releaseItem);
+                                  selectedList.appReleaseItems ??= [];
+                                  selectedList.appReleaseItems!.removeWhere((x) => x.id == releaseItem.id);
+                                  selectedList.appReleaseItems!.add(releaseItem);
+                                  if (isCollectiveSave) {
+                                    if (userService.collective.id == targetOwner.ownerId) {
+                                      userService.collective.itemlists ??= {};
+                                      userService.collective.itemlists![selectedListId] = selectedList;
+                                    }
+                                  } else {
+                                    final target = profile.itemlists?[selectedListId];
+                                    if (target != null && !identical(target, selectedList)) {
+                                      target.appReleaseItems ??= [];
+                                      target.appReleaseItems!.removeWhere((x) => x.id == releaseItem.id);
+                                      target.appReleaseItems!.add(releaseItem);
+                                    } else {
+                                      profile.itemlists ??= {};
+                                      profile.itemlists![selectedListId] = selectedList;
+                                    }
                                   }
                                 }
                               }
-                              if (ok && savedItemId.isNotEmpty && profile.id.isNotEmpty) {
+                              if (ok && !isCollectiveSave && savedItemId.isNotEmpty && profile.id.isNotEmpty) {
                                 profile.favoriteItems ??= [];
                                 if (!profile.favoriteItems!.contains(savedItemId)) {
                                   profile.favoriteItems!.add(savedItemId);
@@ -539,7 +780,7 @@ Future<bool> showAddSongToRepertoireDialog(
                                   await AppProfiles.repository.addFavoriteItem(profile.id, savedItemId);
                                 } catch (_) {}
                               }
-                              if (ctx.mounted) Navigator.of(ctx).pop(ok);
+                              if (ctx.mounted) Sint.pop(ok);
                             },
                       icon: saving
                           ? const SizedBox(
@@ -549,7 +790,11 @@ Future<bool> showAddSongToRepertoireDialog(
                             )
                           : const Icon(Icons.library_add_check_rounded),
                       label: Text(
-                        saving ? 'Guardando...' : 'Agregar a Mi Repertorio',
+                        saving
+                            ? 'Guardando...'
+                            : (targetOwner.isCollective && targetOwner.ownerName.isNotEmpty
+                                ? 'Agregar a ${targetOwner.ownerName}'
+                                : 'Agregar a Mi Repertorio'),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                       ),
                     ),
@@ -566,7 +811,9 @@ Future<bool> showAddSongToRepertoireDialog(
   if (added == true) {
     AppUtilities.showSnackBar(
       title: 'Repertorio actualizado',
-      message: '"$songTitle" ya forma parte de tu repertorio para conectar con Songmates.',
+      message: targetOwner.isCollective && targetOwner.ownerName.isNotEmpty
+          ? '"$songTitle" se agregó al repertorio de ${targetOwner.ownerName}.'
+          : '"$songTitle" ya forma parte de tu repertorio para conectar con Songmates.',
     );
     return true;
   }

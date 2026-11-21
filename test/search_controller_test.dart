@@ -163,10 +163,18 @@ class _TestableAppSearchController extends AppSearchController {
   _TestableAppSearchController({
     this.stubMediaItems = const <String, AppMediaItem>{},
     this.stubReleaseItems = const <String, AppReleaseItem>{},
+    this.stubCollectives = const <String, Collective>{},
   });
 
   final Map<String, AppMediaItem> stubMediaItems;
   final Map<String, AppReleaseItem> stubReleaseItems;
+  final Map<String, Collective> stubCollectives;
+
+  @override
+  Future<void> loadCollectives() async {
+    collectives = Map<String, Collective>.from(stubCollectives);
+    filterCollectives();
+  }
 
   @override
   Future<void> loadMediaItems() async {

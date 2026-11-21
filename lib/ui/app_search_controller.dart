@@ -11,9 +11,11 @@ import 'package:neom_core/app_config.dart';
 import 'package:neom_core/data/api/app_platform_api.dart';
 import 'package:neom_core/data/api/app_release_items.dart';
 import 'package:neom_core/data/firestore/app_media_item_firestore.dart';
+import 'package:neom_core/data/firestore/collective_firestore.dart';
 import 'package:neom_core/domain/model/app_media_item.dart';
 import 'package:neom_core/domain/model/app_profile.dart';
 import 'package:neom_core/domain/model/app_release_item.dart';
+import 'package:neom_core/domain/model/collective.dart';
 import 'package:neom_core/domain/use_cases/mate_service.dart';
 import 'package:neom_core/domain/use_cases/search_service.dart';
 import 'package:neom_core/domain/use_cases/user_service.dart';
@@ -104,12 +106,15 @@ class AppSearchController extends SintController implements SearchService {
 
   Map<String, AppMediaItem> mediaItems = {};
   Map<String, AppReleaseItem> releaseItems = {};
+  Map<String, Collective> collectives = {};
   RxMap<String, AppMediaItem> filteredMediaItems = <String, AppMediaItem>{}.obs;
   RxMap<String, AppReleaseItem> filteredReleaseItems = <String, AppReleaseItem>{}.obs;
+  RxMap<String, Collective> filteredCollectives = <String, Collective>{}.obs;
 
   Rx<SplayTreeMap<double, AppProfile>> sortedProfileLocation = SplayTreeMap<double, AppProfile>().obs;
 
   SearchType searchType = SearchType.profiles;
+  final Rx<SearchType> selectedFilter = SearchType.any.obs;
 
   Rxn<SearchType> moreResultsType = Rxn<SearchType>();
   RxInt moreResultsQty = 0.obs;
@@ -139,9 +144,11 @@ class AppSearchController extends SintController implements SearchService {
         final firstArg = args[0];
         if (firstArg is SearchType) {
           searchType = firstArg;
+          selectedFilter.value = firstArg;
         }
       } else if (args is SearchType) {
         searchType = args;
+        selectedFilter.value = args;
       }
 
       loadSearchInfo();
@@ -161,7 +168,8 @@ class AppSearchController extends SintController implements SearchService {
 
     // Type aliases: ES → enum name
     const typeAliases = <String, String>{
-      'perfiles': 'profiles', 'colectivos': 'collectives', 'eventos': 'events',
+      'perfiles': 'profiles', 'colectivos': 'collectives',
+      'bandas': 'collectives', 'bands': 'collectives', 'eventos': 'events',
       'canciones': 'mediaItems', 'musica': 'mediaItems',
       'lanzamientos': 'releaseItems', 'libros': 'releaseItems', 'todos': 'any', 'todo': 'any',
     };
@@ -172,7 +180,10 @@ class AppSearchController extends SintController implements SearchService {
       final parsed = SearchType.values.where(
         (e) => e.name.toLowerCase() == normalized,
       ).firstOrNull;
-      if (parsed != null) searchType = parsed;
+      if (parsed != null) {
+        searchType = parsed;
+        selectedFilter.value = parsed;
+      }
     }
 
     final qParam = Sint.queryParam('q') ?? Sint.queryParam('buscar');
@@ -200,10 +211,18 @@ class AppSearchController extends SintController implements SearchService {
     searchParam.close();
     filteredMediaItems.close();
     filteredReleaseItems.close();
+    filteredCollectives.close();
+    selectedFilter.close();
     sortedProfileLocation.close();
     moreResultsType.close();
     moreResultsQty.close();
     super.onClose();
+  }
+
+  void setFilter(SearchType type) {
+    searchType = type;
+    selectedFilter.value = type;
+    update([AppPageIdConstants.search]);
   }
 
   Future<void> loadSearchInfo() async {
@@ -211,10 +230,11 @@ class AppSearchController extends SintController implements SearchService {
     if (!_isClosed) _isLoading.value = true;
 
     try {
-      // Always load profiles, releases and media items concurrently
+      // Always load profiles, collectives, releases and media items concurrently
       // so switching category filters / tabs on web or mobile responds immediately
       await Future.wait([
         loadProfiles(),
+        loadCollectives(),
         loadMediaItems(),
         loadReleaseItems(),
       ]);
@@ -243,13 +263,18 @@ class AppSearchController extends SintController implements SearchService {
       AppConfig.logger.t("Filtering for: ${searchParam.value}");
 
       // Filter all categories so count badges and tabs are always in sync
-      filterProfiles(onlyByName: onlyByName);
-      filterMediaItems();
-      filterReleaseItems();
-      sortByLocation();
+      filterResults(onlyByName: onlyByName);
 
       update([AppPageIdConstants.search]);
     });
+  }
+
+  void filterResults({bool onlyByName = false}) {
+    filterProfiles(onlyByName: onlyByName);
+    filterCollectives();
+    filterMediaItems();
+    filterReleaseItems();
+    sortByLocation();
   }
 
   void filterProfiles({bool onlyByName = false}) {
@@ -315,6 +340,55 @@ class AppSearchController extends SintController implements SearchService {
               return name.contains(search) || owner.contains(search) || categoryMatch;
             }),
           );
+  }
+
+  void filterCollectives() {
+    final search = TextUtilities.normalizeString(searchParam.value).toLowerCase();
+    final activeEntries = collectives.entries.where(
+      (entry) => entry.value.isActive && entry.value.name.trim().isNotEmpty,
+    );
+    if (search.isEmpty) {
+      filteredCollectives.value = Map<String, Collective>.fromEntries(activeEntries);
+      return;
+    }
+
+    filteredCollectives.value = Map<String, Collective>.fromEntries(
+      activeEntries.where((entry) {
+        final c = entry.value;
+        final name = TextUtilities.normalizeString(c.name).toLowerCase();
+        if (name.contains(search)) return true;
+
+        final desc = TextUtilities.normalizeString(c.description).toLowerCase();
+        if (desc.contains(search)) return true;
+
+        final genreMatch = c.genres?.entries.any((g) {
+              final key = TextUtilities.normalizeString(g.key).toLowerCase();
+              final val = TextUtilities.normalizeString(g.value.name).toLowerCase();
+              return key.contains(search) || val.contains(search);
+            }) ??
+            false;
+        if (genreMatch) return true;
+
+        final memberMatch = c.members?.values.any((m) {
+              final memberName = TextUtilities.normalizeString(m.name).toLowerCase();
+              final instrName =
+                  TextUtilities.normalizeString(m.instrument?.name ?? '').toLowerCase();
+              return memberName.contains(search) || instrName.contains(search);
+            }) ??
+            false;
+        return memberMatch;
+      }),
+    );
+  }
+
+  Future<void> loadCollectives() async {
+    AppConfig.logger.d("Loading Collectives");
+    try {
+      collectives = await CollectiveFirestore().getCollectives(limit: 50);
+      filterCollectives();
+    } catch (e, st) {
+      NeomErrorLogger.recordError(e, st, module: 'neom_search', operation: 'loadCollectives');
+    }
   }
 
   @override

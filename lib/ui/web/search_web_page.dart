@@ -30,6 +30,7 @@ class _SearchWebPageState extends State<SearchWebPage> {
   static const _filterCycle = [
     SearchType.any,
     SearchType.profiles,
+    SearchType.collectives,
     SearchType.releaseItems,
     SearchType.mediaItems,
   ];
@@ -89,6 +90,7 @@ class _SearchWebPageState extends State<SearchWebPage> {
                               child: Obx(() => SearchWebFilters(
                                 activeFilter: _activeFilter,
                                 profileCount: widget.controller.sortedProfileLocation.value.length,
+                                collectiveCount: widget.controller.filteredCollectives.length,
                                 releaseCount: widget.controller.filteredReleaseItems.length,
                                 mediaCount: widget.controller.filteredMediaItems.length,
                                 onFilterChanged: (type) => setState(() => _activeFilter = type),

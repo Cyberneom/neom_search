@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:neom_commons/app_flavour.dart';
 import 'package:neom_commons/ui/theme/app_color.dart';
 import 'package:neom_commons/ui/widgets/web/web_hover_card.dart';
 import 'package:neom_commons/utils/constants/translations/app_translation_constants.dart';
@@ -9,6 +10,7 @@ class SearchWebFilters extends StatelessWidget {
 
   final SearchType activeFilter;
   final int profileCount;
+  final int collectiveCount;
   final int releaseCount;
   final int mediaCount;
   final ValueChanged<SearchType> onFilterChanged;
@@ -17,6 +19,7 @@ class SearchWebFilters extends StatelessWidget {
     super.key,
     required this.activeFilter,
     required this.profileCount,
+    this.collectiveCount = 0,
     required this.releaseCount,
     required this.mediaCount,
     required this.onFilterChanged,
@@ -24,6 +27,8 @@ class SearchWebFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showCollectivesFilter = AppFlavour.showBands() || collectiveCount > 0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -43,7 +48,7 @@ class SearchWebFilters extends StatelessWidget {
           ),
           _FilterItem(
             label: AppTranslationConstants.all.tr,
-            count: profileCount + releaseCount + mediaCount,
+            count: profileCount + collectiveCount + releaseCount + mediaCount,
             isActive: activeFilter == SearchType.any,
             onTap: () => onFilterChanged(SearchType.any),
           ),
@@ -53,6 +58,13 @@ class SearchWebFilters extends StatelessWidget {
             isActive: activeFilter == SearchType.profiles,
             onTap: () => onFilterChanged(SearchType.profiles),
           ),
+          if (showCollectivesFilter)
+            _FilterItem(
+              label: AppTranslationConstants.collectives.tr,
+              count: collectiveCount,
+              isActive: activeFilter == SearchType.collectives,
+              onTap: () => onFilterChanged(SearchType.collectives),
+            ),
           _FilterItem(
             label: AppTranslationConstants.releases.tr,
             count: releaseCount,
